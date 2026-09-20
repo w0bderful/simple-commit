@@ -1,0 +1,11 @@
+*.pdb
+*.part
+*.tmp
+settings.json
+settings.json.bak
+settings.json.tmp
+work/
+test-results/
+.vs/
+bin/
+obj/
