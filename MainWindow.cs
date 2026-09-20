@@ -238,6 +238,7 @@ public class MainWindow : Form {
         if(found!=null&&(!File.Exists(e.DownloadedPath)||(found.Sha!=""&&e.LastSha!=""&&e.LastSha.StartsWith(found.Sha,StringComparison.OrdinalIgnoreCase)))){e.DownloadedPath=found.Path;e.DownloadedSha=found.Sha;e.ImportedZip=true;e.Status="기존 ZIP 자동 연결";}
     }
     static string Error(Exception e){var w=e as WebException;if(w!=null){var r=w.Response as HttpWebResponse;if(r!=null){int status=(int)r.StatusCode;r.Dispose();if(status==404)return "주소·브랜치 확인";if(status==403||status==429)return "접근 제한 / 요청 한도";}return "네트워크 연결";}return e.Message;}
+    [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool AllowSetForegroundWindow(int processId);
     [STAThread]public static void Main(string[] args){
         ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
         if(args.Contains("--test")){Tests.Run();return;}
@@ -287,6 +288,16 @@ public class MainWindow : Form {
         }
         if(args.Length>1&&args[0]=="--probe"){try{var c=Backend.Latest(Repo.Parse(args[1]),"");Console.WriteLine(c.Sha+" | "+c.CommittedUtc.ToString("o")+" | "+RelativeTime.Format(c.CommittedUtc,DateTime.UtcNow));if(args.Length>2)Console.WriteLine(Backend.Download(Repo.Parse(args[1]),c.Sha,args[2],n=>{}));}catch(Exception e){Console.WriteLine(e);Environment.ExitCode=1;}return;}
         if(args.Length>1&&args[0]=="--ui-test"){testing=true;Application.EnableVisualStyles();using(var f=new MainWindow(false)){f.config.Repositories.Add(new RepoEntry{Url="https://github.com/example/desktop-app",Message="다운로드 안정성 개선",CommitUtc=DateTime.UtcNow.AddMinutes(-7),LastSha=new string('a',40),DownloadedSha=new string('b',40),DownloadedPath=args[1],Status="새 커밋 있음",CheckedUtc=DateTime.UtcNow});f.config.Repositories.Add(new RepoEntry{Url="https://gitgud.io/example/tools",Message="설정 화면 업데이트",CommitUtc=DateTime.UtcNow.AddHours(-2),Status="확인 완료"});f.RefreshList();f.Show();Application.DoEvents();using(var bmp=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(bmp,new Rectangle(0,0,f.Width,f.Height));bmp.Save(args[1]);}f.tray.Dispose();}return;}
-        bool created;using(var mutex=new System.Threading.Mutex(true,"Local\\SimpleCommitApp",out created)){if(!created){MessageBox.Show("이미 실행 중입니다. 트레이 아이콘을 열어 주세요.");return;}Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);Application.Run(new MainWindow(args.Contains("--tray")));}
+        using(var activate=new System.Threading.EventWaitHandle(false,System.Threading.EventResetMode.AutoReset,@"Local\SimpleCommitActivate")){
+            bool created;using(var mutex=new System.Threading.Mutex(true,@"Local\SimpleCommitApp",out created)){
+                if(!created){AllowSetForegroundWindow(-1);activate.Set();return;}
+                Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
+                using(var window=new MainWindow(args.Contains("--tray")))using(var activationTimer=new Timer{Interval=200}){
+                    activationTimer.Tick+=delegate{if(activate.WaitOne(0))window.Restore();};
+                    window.Shown+=delegate{activationTimer.Start();};
+                    Application.Run(window);
+                }
+            }
+        }
     }
 }
