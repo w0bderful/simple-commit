@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
@@ -10,10 +10,36 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.7.2")]
 
+public static class SettingsStore {
+    public static string ListPath(string path){return Path.Combine(Path.GetDirectoryName(path),"repositories.json");}
+    public static Settings Load(string path){
+        var json=new JavaScriptSerializer();
+        var settings=File.Exists(path)?json.Deserialize<Settings>(File.ReadAllText(path,Encoding.UTF8)):new Settings();
+        if(settings==null)throw new InvalidDataException("설정 파일이 비어 있습니다.");
+        settings.Migrate();
+        string listPath=ListPath(path);
+        if(File.Exists(listPath))settings.Repositories=json.Deserialize<List<RepoEntry>>(File.ReadAllText(listPath,Encoding.UTF8))??throwInvalidList();
+        return settings;
+    }
+    static List<RepoEntry> throwInvalidList(){throw new InvalidDataException("저장소 목록 파일이 비어 있습니다.");}
+    static void Write(string path,string text){
+        string tmp=path+".tmp";File.WriteAllText(tmp,text,Encoding.UTF8);
+        if(File.Exists(path))File.Replace(tmp,path,path+".bak");else File.Move(tmp,path);
+    }
+    public static void Save(string path,Settings settings){
+        Directory.CreateDirectory(Path.GetDirectoryName(path));var json=new JavaScriptSerializer();
+        var values=json.Deserialize<Dictionary<string,object>>(json.Serialize(settings));
+        foreach(string key in new[]{"Repositories","Url","Branch","Folder","LastSha","Key","NextUtc","Watching"})values.Remove(key);
+        // Write the list first so a failed migration never removes the only saved copy.
+        Write(ListPath(path),json.Serialize(settings.Repositories));
+        Write(path,json.Serialize(values));
+    }
+}
 public class Settings {
     public string DefaultDownloadFolder=Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
     public int CheckMinutes=180;
     public int NotificationSeconds=7;
+    public bool KeepNotificationUntilDismissed=true;
     public bool SortRecent=false;
     public List<RepoEntry> Repositories = new List<RepoEntry>();
     public string Url = "", Branch = "", Folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);

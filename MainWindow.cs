@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -87,6 +87,7 @@ public class MainWindow : Form {
     CheckBox startup=new CheckBox(); NotifyIcon tray=new NotifyIcon(); Timer timer=new Timer();
     TabControl tabs=new TabControl();TabPage repositoriesTab=new TabPage("저장소"),settingsTab=new TabPage("설정");
     NumericUpDown noticeSeconds=new NumericUpDown();Label folderSetting=new Label(),linkSetting=new Label(),settingsStatus=new Label();ToastWindow notification;
+    bool storageReadFailed;
     string configFile=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"SimpleCommit","settings.json");
     public MainWindow(bool inTray) {
         Icon=AppVisual.Load(32);
@@ -123,7 +124,7 @@ public class MainWindow : Form {
         repositoriesTab.Resize+=delegate{LayoutRepositoryTab();};
         details.Font=new Font("맑은 고딕",9); details.ForeColor=Color.DimGray; details.AutoEllipsis=true; schedule.ForeColor=Color.DimGray;
         config=new Settings();
-        try{if(!testing && File.Exists(configFile)) config=new JavaScriptSerializer().Deserialize<Settings>(File.ReadAllText(configFile,Encoding.UTF8))??new Settings();config.Migrate();}catch{state.Text="기존 설정을 읽지 못했습니다. 설정 파일을 확인해 주세요.";}
+        try{if(!testing)config=SettingsStore.Load(configFile);config.Migrate();}catch{storageReadFailed=true;state.Text="설정 또는 저장소 목록을 읽지 못했습니다. 원본 보호를 위해 저장을 중단했습니다.";}
         interval.Value=config.CheckMinutes;
         interval.ValueChanged+=delegate{config.CheckMinutes=(int)interval.Value;foreach(var e in config.Repositories)e.NextUtc=DateTime.UtcNow.AddMinutes(config.CheckMinutes);Save();RefreshSchedule();settingsStatus.Text="자동 확인 간격을 "+config.CheckMinutes+"분으로 저장했습니다.";};
         startup.Text="윈도우 시작 시 트레이에서 자동 실행"; startup.Checked=config.StartWithWindows;
@@ -164,6 +165,8 @@ public class MainWindow : Form {
         defaultFolder.Text="기본 다운로드 폴더 변경";Setting(defaultFolder,24,183,240,36);folderSetting.Text=config.DefaultDownloadFolder;folderSetting.AutoEllipsis=true;Setting(folderSetting,24,229,1010,28);
         Setting(new Label{Text="새 저장소에 적용됩니다. 기존 저장소의 폴더는 수정 버튼에서 바꾸세요.",ForeColor=Color.DimGray},24,261,1010,26);
         Setting(new Label{Text="자체 알림 표시 시간"},24,323,190,26);noticeSeconds.Minimum=1;noticeSeconds.Maximum=120;noticeSeconds.Value=config.NotificationSeconds;Setting(noticeSeconds,220,319,90,30);Setting(new Label{Text="초"},322,323,40,26);
+        var keepNotice=new CheckBox{Text="확인할 때까지 알림 유지",Checked=config.KeepNotificationUntilDismissed};Setting(keepNotice,575,320,360,30);noticeSeconds.Enabled=!keepNotice.Checked;
+        keepNotice.CheckedChanged+=delegate{config.KeepNotificationUntilDismissed=keepNotice.Checked;noticeSeconds.Enabled=!keepNotice.Checked;Save();settingsStatus.Text=keepNotice.Checked?"알림을 확인하거나 닫을 때까지 유지합니다.":"설정한 시간이 지나면 알림을 닫습니다.";};
         noticeSeconds.ValueChanged+=delegate{config.NotificationSeconds=(int)noticeSeconds.Value;Save();settingsStatus.Text="알림 표시 시간을 "+config.NotificationSeconds+"초로 저장했습니다.";};
         var preview=new Button{Text="알림 미리보기"};Setting(preview,375,316,170,36);preview.Click+=delegate{ShowNotice("새 커밋 알림","화면 오른쪽 아래에 표시되는 자체 알림입니다.\n클릭하면 저장소 목록을 엽니다.",true);};
         Setting(new Label{Text="오른쪽 아래에 표시 · 클릭하면 목록 열기 · ×로 바로 닫기",ForeColor=Color.DimGray},24,365,1010,26);
@@ -172,7 +175,7 @@ public class MainWindow : Form {
     }
     void ButtonAt(Button b,string text,int x,int y,int w){b.Text=text;Put(b,x,y,w,36);}
     void Restore(){Show();WindowState=FormWindowState.Normal;Activate();}
-    void ShowNotice(string title,string message,bool preview=false){if(testing&&!preview)return;if(notification!=null&&!notification.IsDisposed)notification.Close();notification=new ToastWindow(title,message,config.NotificationSeconds,delegate{tabs.SelectedTab=repositoriesTab;Restore();});notification.ShowAt(Screen.FromControl(this));}
+    void ShowNotice(string title,string message,bool preview=false){if(testing&&!preview)return;if(notification!=null&&!notification.IsDisposed)notification.Close();notification=new ToastWindow(title,message,config.KeepNotificationUntilDismissed?0:config.NotificationSeconds,delegate{tabs.SelectedTab=repositoriesTab;Restore();});notification.ShowAt(Screen.FromControl(this));}
     RepoEntry Selected(){return list.SelectedItems.Count==0?null:list.SelectedItems[0].Tag as RepoEntry;}
     void Select(RepoEntry entry){foreach(ListViewItem row in list.Items)if(row.Tag==entry){row.Selected=true;row.EnsureVisible();break;}}
     bool Duplicate(RepoEntry item,RepoEntry except){if(config.Repositories.Any(e=>e!=except&&e.Identity==item.Identity)){MessageBox.Show(this,"이미 등록한 저장소와 브랜치입니다.");return true;}return false;}
@@ -197,7 +200,7 @@ public class MainWindow : Form {
     static string Exact(DateTime d){return d==DateTime.MinValue?"—":d.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");}
     void RefreshDetails(){var e=Selected();linkSetting.Text=e==null?"저장소 탭에서 연결할 항목을 먼저 선택하세요.":"선택: "+Repo.Parse(e.Url).Name;edit.Enabled=remove.Enabled=link.Enabled=!busy&&e!=null;int checkedCount=config.Repositories.Count(x=>x.DownloadSelected);download.Enabled=!busy&&checkedCount>0;selectedCount.Text="다운로드 선택 "+checkedCount+" / "+config.Repositories.Count+"개 · 체크한 목록은 자동 저장됩니다.";details.Text=e==null?"목록에서 저장소를 선택하세요. ZIP 최신 여부는 마지막 성공한 확인 기준입니다.":"커밋: "+Exact(e.CommitUtc)+"  |  마지막 성공 확인: "+Exact(e.CheckedUtc)+"  |  "+e.LastSha+"\nZIP: "+(e.DownloadedPath==""?"아직 다운로드하지 않았습니다.":e.DownloadedPath)+(e.ImportedZip?"  (기존 ZIP은 파일명·폴더명 커밋 ID로 추정)":"");}
     void RefreshSchedule(){DateTime next=config.Repositories.Count==0?DateTime.MinValue:config.Repositories.Min(e=>e.NextUtc);schedule.Text="등록 "+config.Repositories.Count+"개 · "+config.CheckMinutes+"분마다 자동 확인 · "+(config.Repositories.Count==0?"저장소 등록 대기":next<=DateTime.UtcNow?"확인 대기":"다음 "+next.ToLocalTime().ToString("MM/dd HH:mm"))+" · 창을 닫아도 트레이에서 실행";}
-    bool Save(){if(testing)return true;try{Directory.CreateDirectory(Path.GetDirectoryName(configFile));var tmp=configFile+".tmp";File.WriteAllText(tmp,new JavaScriptSerializer().Serialize(config),Encoding.UTF8);if(File.Exists(configFile))File.Replace(tmp,configFile,configFile+".bak");else File.Move(tmp,configFile);return true;}catch(Exception e){state.Text="설정 저장 실패: "+e.Message;return false;}}
+    bool Save(){if(testing)return true;if(storageReadFailed)return false;try{SettingsStore.Save(configFile,config);return true;}catch(Exception e){state.Text="설정 저장 실패: "+e.Message;return false;}}
     void RegisterStartup(){if(testing)return;try{using(var key=Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")){if(config.StartWithWindows)key.SetValue("SimpleCommit","\""+Application.ExecutablePath+"\" --tray");else key.DeleteValue("SimpleCommit",false);}}catch(Exception e){state.Text="자동 시작 등록 실패: "+e.Message;}}
     async Task Run(List<RepoEntry> entries,bool getZip){
         if(busy||entries.Count==0)return;busy=true;foreach(var b in new Control[]{add,bulkAdd,edit,remove,check,interval,download,link,selectAll,selectNone,defaultFolder,sortRecent})b.Enabled=false;int failed=0,updated=0,downloaded=0,skipped=0;string saved=null;

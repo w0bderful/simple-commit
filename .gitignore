@@ -9,3 +9,5 @@ test-results/
 .vs/
 bin/
 obj/
+
+repositories.json*

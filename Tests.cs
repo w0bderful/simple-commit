@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.IO.Compression;
 using System.Web.Script.Serialization;
@@ -6,6 +6,16 @@ public static class Tests {
     static int count;
     static void Check(bool b,string message){count++;if(!b)throw new Exception(message);}
     public static void Run(){
+        string storageDir=Path.Combine(Path.GetTempPath(),"SimpleCommit-store-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(storageDir);
+        try{
+            string storagePath=Path.Combine(storageDir,"settings.json");var original=new Settings{CheckMinutes=42};original.Repositories.Add(new RepoEntry{Url="https://github.com/a/b",DownloadSelected=true});
+            File.WriteAllText(storagePath,new JavaScriptSerializer().Serialize(original));
+            var migrated=SettingsStore.Load(storagePath);SettingsStore.Save(storagePath,migrated);
+            Check(!File.ReadAllText(storagePath).Contains("Repositories"),"settings excludes repository list");
+            var loaded=SettingsStore.Load(storagePath);Check(loaded.CheckMinutes==42&&loaded.Repositories.Count==1&&loaded.Repositories[0].DownloadSelected,"legacy list migration preserves settings and selection");
+            loaded.Repositories.Clear();SettingsStore.Save(storagePath,loaded);Check(SettingsStore.Load(storagePath).Repositories.Count==0,"empty separate list stays empty");
+            File.WriteAllText(SettingsStore.ListPath(storagePath),"invalid json");bool rejected=false;try{SettingsStore.Load(storagePath);}catch{rejected=true;}Check(rejected,"corrupt list does not silently reset");
+        }finally{Directory.Delete(storageDir,true);}
         var now=new DateTime(2026,9,20,12,0,0,DateTimeKind.Utc);
         var older=new RepoEntry{Url="https://github.com/a/old",CommitUtc=now.AddDays(-1),DownloadSelected=true};var latest=new RepoEntry{Url="https://github.com/a/new",CommitUtc=now};var unknown=new RepoEntry{Url="https://github.com/a/unknown"};
         var ordering=new System.Collections.Generic.List<RepoEntry>{unknown,older,latest};RepoOrder.Recent(ordering);Check(ordering[0]==latest&&ordering[2]==unknown,"recent commits first, unknown dates last");
@@ -57,7 +67,7 @@ public static class Tests {
         var options=new Settings{DefaultDownloadFolder="C:\\CustomDownloads"};var restored=js.Deserialize<Settings>(js.Serialize(options));
         var timing=new Settings{CheckMinutes=25,Watching=false};timing.Migrate();var timingRestored=js.Deserialize<Settings>(js.Serialize(timing));Check(timingRestored.CheckMinutes==25&&timingRestored.Watching,"interval persists and monitoring always enabled");
         timing.CheckMinutes=0;timing.Migrate();Check(timing.CheckMinutes==1,"interval lower bound");
-        timing.NotificationSeconds=12;var noticeSettings=js.Deserialize<Settings>(js.Serialize(timing));Check(noticeSettings.NotificationSeconds==12,"notification duration persists");noticeSettings.NotificationSeconds=0;noticeSettings.Migrate();Check(noticeSettings.NotificationSeconds==1,"notification minimum");
+        Check(js.Deserialize<Settings>("{}").KeepNotificationUntilDismissed,"existing settings default to persistent notifications");timing.KeepNotificationUntilDismissed=false;Check(!js.Deserialize<Settings>(js.Serialize(timing)).KeepNotificationUntilDismissed,"notification persistence preference saves");timing.NotificationSeconds=12;var noticeSettings=js.Deserialize<Settings>(js.Serialize(timing));Check(noticeSettings.NotificationSeconds==12,"notification duration persists");noticeSettings.NotificationSeconds=0;noticeSettings.Migrate();Check(noticeSettings.NotificationSeconds==1,"notification minimum");
         Check(restored.DefaultDownloadFolder==options.DefaultDownloadFolder,"default folder persistence");
         using(var d=new RepoDialog(null,restored.DefaultDownloadFolder))Check(d.Folder==options.DefaultDownloadFolder,"new repository uses default folder");
         using(var d=new RepoDialog(new RepoEntry{Folder="C:\\Existing"},restored.DefaultDownloadFolder))Check(d.Folder=="C:\\Existing","existing folder stays unchanged");
