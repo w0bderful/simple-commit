@@ -40,6 +40,7 @@ public class Settings {
     public int CheckMinutes=180;
     public int NotificationSeconds=7;
     public bool KeepNotificationUntilDismissed=true;
+    public bool TrayHintShown=false;
     public bool SortRecent=false;
     public List<RepoEntry> Repositories = new List<RepoEntry>();
     public string Url = "", Branch = "", Folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
