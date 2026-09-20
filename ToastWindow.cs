@@ -1,14 +1,6 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
-public static class NotificationSound {
-    static readonly Lazy<System.Media.SoundPlayer> sound=new Lazy<System.Media.SoundPlayer>(()=>{
-        var stream=typeof(NotificationSound).Assembly.GetManifestResourceStream("ding.wav");
-        if(stream==null)throw new System.IO.FileNotFoundException("Notification sound resource is missing.");
-        var player=new System.Media.SoundPlayer(stream);player.Load();return player;
-    });
-    public static void Play(){try{sound.Value.Play();}catch{ /* Audio unavailable must not interrupt notifications. */ }}
-}
 public sealed class ToastWindow:Form {
     readonly Timer life=new Timer();DateTime expires;readonly int seconds;
     protected override bool ShowWithoutActivation {get{return true;}}

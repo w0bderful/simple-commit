@@ -50,6 +50,5 @@ Windows에 포함된 .NET Framework C# 컴파일러를 사용합니다. NuGet �
 - `ToastWindow.cs`: 자체 알림창
 - `Tests.cs`: 로컬 동작 검증
 - `app.ico`, `app-icon.png`: 앱 아이콘
-- `ding.wav`, `generate-sound.ps1`: 제작한 사운드 원본 (현재 알림에서는 재생하지 않음)
 
 자동 생성된 개인 설정, 다운로드한 외부 저장소, 테스트 산출물은 이 저장소에 포함하지 않습니다.
