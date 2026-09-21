@@ -8,6 +8,16 @@ public static class Tests {
     public static void Run(){
         string storageDir=Path.Combine(Path.GetTempPath(),"SimpleCommit-store-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(storageDir);
         try{
+            string zipTarget=Backend.DownloadPath(Repo.Parse("https://github.com/a/sample"),"master",storageDir);
+            Check(Path.GetFileName(zipTarget)=="sample-master.zip","stable branch ZIP filename");
+            Check(Path.GetFileName(Backend.DownloadPath(Repo.Parse("https://github.com/a/sample"),"feature/fix",storageDir))=="sample-feature_fix.zip","branch filename sanitization");
+            string zipTemp=Path.Combine(storageDir,"new.part"),oldZip=Path.Combine(storageDir,"old.zip");
+            File.WriteAllText(zipTarget,"previous");File.WriteAllText(zipTemp,"broken");bool zipRejected=false;try{Backend.InstallZip(zipTemp,zipTarget);}catch{zipRejected=true;}
+            Check(zipRejected&&File.ReadAllText(zipTarget)=="previous","invalid download preserves old ZIP");File.Delete(zipTemp);
+            using(var archive=ZipFile.Open(zipTemp,ZipArchiveMode.Create)){archive.CreateEntry("sample/file.txt");}
+            File.WriteAllText(oldZip,"old");Backend.InstallZip(zipTemp,zipTarget);Backend.DeletePreviousZip(oldZip,zipTarget);
+            Check(File.Exists(zipTarget)&&!File.Exists(oldZip)&&!File.Exists(zipTemp),"successful ZIP replaces target and deletes tracked previous file");
+            Backend.DeletePreviousZip(zipTarget,zipTarget);Check(File.Exists(zipTarget),"same path cleanup preserves new ZIP");
             string storagePath=Path.Combine(storageDir,"settings.json");var original=new Settings{CheckMinutes=42};original.Repositories.Add(new RepoEntry{Url="https://github.com/a/b",DownloadSelected=true});
             File.WriteAllText(storagePath,new JavaScriptSerializer().Serialize(original));
             var migrated=SettingsStore.Load(storagePath);SettingsStore.Save(storagePath,migrated);

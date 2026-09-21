@@ -224,7 +224,22 @@ public static class Backend {
         using (var response = Request(repo.CommitUrl(branch)).GetResponse())
         using (var reader = new StreamReader(response.GetResponseStream())) return Decode(reader.ReadToEnd(), !repo.GitLabApi);
     }
-    public static string Download(Repo repo, string sha, string folder, Action<long> progress) {
+    public static string DownloadPath(Repo repo,string branch,string folder){
+        if(String.IsNullOrWhiteSpace(branch))throw new InvalidOperationException("기본 브랜치를 확인할 수 없습니다. 브랜치를 선택해 주세요.");
+        string name=repo.Name+"-"+branch;
+        foreach(char c in Path.GetInvalidFileNameChars())name=name.Replace(c,'_');
+        return Path.GetFullPath(Path.Combine(folder,name+".zip"));
+    }
+    public static string InstallZip(string temp,string path){
+        using(var zip=ZipFile.OpenRead(temp)){if(zip.Entries.Count==0)throw new InvalidDataException("다운로드된 ZIP이 비어 있습니다.");}
+        if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);
+        return path;
+    }
+    public static void DeletePreviousZip(string previous,string current){
+        if(String.IsNullOrWhiteSpace(previous)||!String.Equals(Path.GetExtension(previous),".zip",StringComparison.OrdinalIgnoreCase))return;
+        if(!String.Equals(Path.GetFullPath(previous),Path.GetFullPath(current),StringComparison.OrdinalIgnoreCase)&&File.Exists(previous))File.Delete(previous);
+    }
+    public static string Download(Repo repo, string sha, string folder, Action<long> progress, string branch=null) {
         Directory.CreateDirectory(folder);
         string temp = System.IO.Path.Combine(folder, ".simplecommit-" + Guid.NewGuid().ToString("N") + ".part");
         try {
@@ -235,10 +250,8 @@ public static class Backend {
                 while ((count = input.Read(b, 0, b.Length)) > 0) { output.Write(b, 0, count); total += count; if ((DateTime.UtcNow-last).TotalMilliseconds > 300) { progress(total); last = DateTime.UtcNow; } }
             }
             using (var zip = ZipFile.OpenRead(temp)) { if (zip.Entries.Count == 0) throw new Exception("다운로드된 ZIP이 비어 있습니다."); }
-            string name = repo.Name + "-" + sha.Substring(0, 8) + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
-            string path = System.IO.Path.Combine(folder, name + ".zip"); int i = 2;
-            while (File.Exists(path)) path = System.IO.Path.Combine(folder, name + "-" + (i++) + ".zip");
-            File.Move(temp, path); return path;
+            if(String.IsNullOrWhiteSpace(branch))branch=Branches(repo,System.Threading.CancellationToken.None).Default;
+            return InstallZip(temp,DownloadPath(repo,branch,folder));
         } finally { if (File.Exists(temp)) File.Delete(temp); }
     }
 }
