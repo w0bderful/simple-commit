@@ -34,7 +34,7 @@
       "signExecutable": false
     },
     "portable": {
-      "artifactName": "SimpleCommit-Electron-${version}.exe"
+      "artifactName": "SimpleCommit.exe"
     }
   },
   "devDependencies": {

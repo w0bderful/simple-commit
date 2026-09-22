@@ -4,7 +4,7 @@ GitHub, GitGud, Codeberg, GitLab.com의 공개 저장소 커밋을 확인하고 
 
 ## 실행
 
-릴리스의 `SimpleCommit-Electron-0.1.0.exe`를 실행합니다. 창을 닫으면 트레이에서 자동 확인을 계속하며, 다시 실행하면 기존 창을 엽니다. 트레이 메뉴의 **종료**로 완전히 종료합니다.
+릴리스의 `SimpleCommit.exe`를 실행합니다. 창을 닫으면 트레이에서 자동 확인을 계속하며, 다시 실행하면 기존 창을 엽니다. 트레이 메뉴의 **종료**로 완전히 종료합니다.
 
 - 여러 저장소 일괄 등록, 브랜치 자동 조회, 최근 커밋 시간과 ZIP 최신 여부 표시
 - 선택 목록 저장, 전체 선택/취소, 최근 커밋순 또는 드래그 정렬
@@ -39,7 +39,7 @@ pnpm start
 pnpm run build
 ```
 
-결과: `electron/dist/SimpleCommit-Electron-0.1.0.exe`
+결과: `electron/dist/SimpleCommit.exe`
 
 - `electron/main.cjs`: 창, 트레이, 단일 인스턴스, 네이티브 파일 선택 및 자동 시작
 - `electron/backend.cjs`: 루프백 API, 저장소 조회, ZIP 처리 및 데이터 저장

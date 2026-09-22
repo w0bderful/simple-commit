@@ -1,6 +1,6 @@
 SimpleCommit 사용법
 
-1. SimpleCommit-Electron-0.1.0.exe를 실행합니다.
+1. SimpleCommit.exe를 실행합니다.
 2. 저장소 추가에서 GitHub, GitGud, Codeberg, GitLab.com 링크를 입력합니다.
    여러 주소는 한 줄에 하나씩 입력하세요. 단일 주소는 브랜치를 자동 조회합니다.
 3. 다운로드할 항목을 체크하고 선택 ZIP 다운로드를 누릅니다.
