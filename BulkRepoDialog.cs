@@ -18,7 +18,7 @@ public class BulkInput {
     }
 }
 public class BulkRepoDialog:Form {
-    TextBox links=new TextBox(),folder=new TextBox(),problems=new TextBox();Label summary=new Label();Button register=new Button();
+    TextBox links=new TextBox(),folder=new TextBox(),problems=new TextBox();Label summary=new Label();Button register=new MaterialButton();
     public List<string> Urls=new List<string>();
     public string Folder {get{return folder.Text;}}
     public BulkRepoDialog(string defaultFolder){Shown+=delegate{AppTheme.Apply(this);};
@@ -30,10 +30,10 @@ public class BulkRepoDialog:Form {
         problems.Multiline=true;problems.ReadOnly=true;problems.BorderStyle=BorderStyle.None;problems.BackColor=BackColor;problems.ForeColor=Color.Firebrick;problems.ScrollBars=ScrollBars.Vertical;Add(problems,20,338,610,50);problems.Anchor=AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Bottom;
         var label=new Label{Text="이번에 등록할 저장소의 다운로드 폴더"};Add(label,20,396,610,25);label.Anchor=AnchorStyles.Left|AnchorStyles.Bottom;
         folder.ReadOnly=true;folder.Text=defaultFolder;Add(folder,20,425,493,28);folder.Anchor=AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Bottom;
-        var browse=new Button{Text="폴더 선택"};Add(browse,523,423,107,32);browse.Anchor=AnchorStyles.Right|AnchorStyles.Bottom;
+        var browse=new MaterialButton{Text="폴더 선택"};Add(browse,523,423,107,32);browse.Anchor=AnchorStyles.Right|AnchorStyles.Bottom;
         browse.Click+=delegate{using(var d=new FolderBrowserDialog{SelectedPath=folder.Text})if(d.ShowDialog(this)==DialogResult.OK)folder.Text=d.SelectedPath;};
         Add(register,378,479,140,34);register.Anchor=AnchorStyles.Right|AnchorStyles.Bottom;
-        var cancel=new Button{Text="취소",DialogResult=DialogResult.Cancel};Add(cancel,528,479,102,34);cancel.Anchor=AnchorStyles.Right|AnchorStyles.Bottom;CancelButton=cancel;
+        var cancel=new MaterialButton{Text="취소",DialogResult=DialogResult.Cancel};Add(cancel,528,479,102,34);cancel.Anchor=AnchorStyles.Right|AnchorStyles.Bottom;CancelButton=cancel;
         // Enter inserts another URL line; registration is an explicit button action.
         links.TextChanged+=delegate{UpdateInput();};
         register.Click+=delegate{var input=BulkInput.Parse(links.Text);if(input.Errors.Count>0||input.Urls.Count==0)return;Urls=input.Urls;DialogResult=DialogResult.OK;};
