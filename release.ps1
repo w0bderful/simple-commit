@@ -21,7 +21,7 @@ foreach($line in $lines){if($line -match '^([^=]+)=(.*)$'){$credential[$matches[
 $headers=@{Authorization=('Bearer '+$credential['password']);Accept='application/vnd.github+json';'User-Agent'='SimpleCommit-release'}
 $api='https://api.github.com/repos/w0bderful/simple-commit'
 $previous=@();$page=1
-do{$batch=@(Invoke-RestMethod "$api/releases?per_page=100&page=$page" -Headers $headers);$previous+=$batch;$page++}while($batch.Count -eq 100)
+do{$response=Invoke-RestMethod "$api/releases?per_page=100&page=$page" -Headers $headers;$batch=@($response);$previous+=$batch;$page++}while($batch.Count -eq 100)
 if($previous | Where-Object tag_name -eq $tag){throw "Release $tag already exists. Each release must use a new version."}
 $remoteTag=git ls-remote --tags origin "refs/tags/$tag"
 CheckExit 'Tag lookup'
