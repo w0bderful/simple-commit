@@ -1,16 +1,31 @@
-# Electron 검증
+# Electron / Node.js 검증
 
-2026-09-22, Electron 44.4.3 / electron-builder 26.15.3 / Windows x64.
+2026-09-22 · Windows x64 · Electron 44.4.3 · electron-builder 26.15.3
 
-- 개발 실행 및 portable EXE 실행 모두 통과
-- 별도 테스트 데이터의 저장소 2개와 검은색 테마 로드
-- 렌더러 `require` 미노출 확인 (`undefined`)
-- 창 닫기 시 트레이 숨김 및 기존 창 복원
-- 두 번째 실행이 기존 프로세스로 전달됨 (`SECOND_INSTANCE`)
-- `--tray` 실행 시 초기 창 숨김
-- 테스트 종료 후 자식 로컬 서버 종료
-- 단일 EXE 크기: 약 97 MiB
+## 자동 검사
 
-실제 사용자 데이터는 `%LOCALAPPDATA%\SimpleCommitWeb`을 그대로 사용합니다. 테스트는 `--smoke-data`로 분리했습니다.
+`pnpm test`: 13개 테스트 통과.
 
-참고: https://www.electronjs.org/docs/latest/tutorial/security
+- 4개 호스팅 제공자의 URL, 하위 그룹, 브랜치 페이지 조회 및 인코딩
+- 설정/목록 분리 저장, BOM 및 현재 날짜 형식, 선택 상태 보존
+- 손상된 파일 덮어쓰기 방지, 이전 inline 목록 자동 변환 없음
+- 일괄 등록/가져오기 전체 검증 후 적용, 중복 방지
+- 순서 변경, 수정, 확인 간격, 알림 확인, 자동 시작 설정 전달
+- ZIP 식별/자동 연결, 동일 이름 저장소의 모호한 연결 방지
+- 최신 ZIP 건너뛰기, SHA 고정 다운로드, master 파일명 유지
+- 기존 같은 이름 ZIP 교체, 이전 추적 ZIP 삭제, 공유 파일 보호
+- 실패한 다운로드의 기존 파일 보존 및 임시 파일 정리
+- 로컬 HTTP 토큰/Origin/Host/메서드 검사, 작업 중 수정 방지
+
+## 실제 연동 및 실행
+
+- 실제 GitHub octocat/Hello-World의 브랜치 3개, 기본 master, 최신 커밋 조회
+- SHA를 지정한 ZIP 다운로드 및 ZIP 메타데이터 확인
+- 현재 사용자 데이터 7개를 새 백엔드에서 읽기 성공
+- 별도 복사본의 7개 저장소를 패키지 창에서 표시
+- 렌더러 require 미노출, 창 닫기 → 트레이 숨김 → 복원
+- 재실행 시 SECOND_INSTANCE 이벤트 및 기존 창 복원
+- 최종 portable EXE의 --tray 최초 숨김, UI 연결, 복원, 재실행 통과
+- 패키지 resources에 C# 서버 실행 파일 없음
+
+실제 네트워크 연동은 GitHub에서 검증했습니다. 다른 제공자의 요청 구성과 응답 해석은 고정 응답 테스트로 검증했습니다. Windows 로그아웃/로그인 자체는 수행하지 않았습니다.

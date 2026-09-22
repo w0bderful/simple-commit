@@ -1,29 +1,31 @@
 # SimpleCommit Electron
 
-브라우저를 따로 열지 않고 자체 프로그램 창에서 실행하는 Windows x64 버전입니다.
+Electron 내장 Node.js에서 백엔드를 실행합니다. C# 소스, C# 서버 실행 파일, .NET Framework 의존성이 없습니다.
 
-## 사용
+## 실행
 
-`SimpleCommit-Electron-0.1.0.exe`를 실행하세요. 설치 없이 실행하며 Electron과 로컬 서버가 함께 포함되어 있습니다. .NET Framework 4.7.2 이상이 필요합니다.
+`SimpleCommit-Electron-0.1.0.exe`를 실행합니다. 닫기 버튼은 트레이로 숨기며, 트레이 더블클릭 또는 재실행하면 기존 창을 엽니다. 작업 중에는 종료를 막아 ZIP 저장을 보호합니다.
 
-- 창의 × 버튼: 트레이로 숨김. 자동 확인은 계속됩니다.
-- 트레이 아이콘 더블클릭 또는 다시 실행: 기존 창 열기.
-- 트레이 메뉴 **종료**: 진행 중인 작업이 없으면 프로그램과 서버를 함께 종료합니다.
-- 저장소 페이지 링크만 기본 브라우저로 엽니다.
-- 설정의 Windows 자동 시작을 켜면 이 Electron 프로그램을 트레이로 실행합니다. 휴대용 EXE를 이동한 경우 설정을 다시 저장하세요.
+설정의 Windows 자동 시작을 켜면 이 프로그램을 트레이에서 실행합니다. 휴대용 EXE를 이동했다면 새 위치에서 다시 실행하세요.
 
-설정과 목록은 기존 웹 앱과 동일한 `%LOCALAPPDATA%\SimpleCommitWeb`에 저장합니다. 이전 버전 데이터는 자동으로 가져오지 않습니다. 구형 앱과 동시에 실행하지 마세요.
+데이터는 `%LOCALAPPDATA%\SimpleCommitWeb`의 `settings.json`과 `repositories.json`에 저장합니다. 현재 파일 형식을 그대로 사용하며 이전 폴더를 자동으로 가져오지 않습니다. 설정에서 JSON 목록 내보내기/가져오기를 지원합니다.
 
-**설정 → 저장소 목록**에서 JSON 내보내기·가져오기를 사용할 수 있습니다.
+## 개발
 
-## 개발/빌드
+```powershell
+pnpm install --frozen-lockfile
+node node_modules/electron/install.js
+pnpm test
+pnpm start
+pnpm run build
+```
 
-1. `../web/build.ps1`로 백엔드를 빌드합니다.
-2. `pnpm install --frozen-lockfile`
-3. `node node_modules/electron/install.js`
-4. `pnpm start` 또는 `pnpm run build`
+개발용 화면 검사:
 
-Electron 창은 Node 통합 없이 sandbox/context isolation을 사용합니다. 내장 화면은 실행별 로컬 포트로 연결하며 외부 페이지를 프로그램 안에 로드하지 않습니다.
+```powershell
+node_modules/electron/dist/electron.exe . --smoke-test --smoke-data=C:\test\simplecommit
+```
 
-개발용 연동 검사: `electron . --smoke-test --smoke-data=C:\test\simplecommit`
-별도 데이터로 화면 렌더링, 트레이 숨김/복원, 재실행 처리를 검사하고 15초 뒤 종료합니다.
+별도 데이터로 화면 연결, 렌더링, 트레이 숨김/복원, 재실행 처리를 검사하고 15초 뒤 종료합니다. 테스트 모드에서는 자동 확인과 자동 시작 등록을 수행하지 않습니다.
+
+창은 Node 통합 없이 sandbox/context isolation을 사용합니다. HTTP 서버는 127.0.0.1의 임의 포트에만 바인딩하고 실행마다 생성한 토큰을 요구합니다. 외부 저장소 링크는 기본 브라우저에서 엽니다.

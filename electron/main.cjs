@@ -1,8 +1,8 @@
 const {app,BrowserWindow,Tray,Menu,dialog,shell,session}=require('electron');
 const {spawn}=require('node:child_process');
 const path=require('node:path');
-const net=require('node:net');
 const fs=require('node:fs');
+const {Backend}=require('./backend.cjs');
 
 let window,tray,backend,origin,token,quitting=false,checkingQuit=false;
 const smoke=process.argv.includes('--smoke-test');
@@ -11,26 +11,24 @@ const startHidden=process.argv.includes('--tray');
 const log=(message)=>{if(smoke&&smokeData){fs.mkdirSync(smokeData,{recursive:true});fs.appendFileSync(path.join(smokeData,'electron-test.log'),message+'\n');}};
 function openWindow(){if(!window)return;if(window.isMinimized())window.restore();window.show();window.focus();}
 function external(url){try{const u=new URL(url);if(u.protocol==='https:'&&['github.com','gitgud.io','gitlab.com','codeberg.org'].includes(u.hostname))shell.openExternal(url);}catch{}}
-async function port(){return new Promise((resolve,reject)=>{const s=net.createServer();s.once('error',reject);s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>resolve(p));});});}
 async function api(route,data){const response=await fetch(origin+'/api/'+route,{method:data===undefined?'GET':'POST',headers:{'X-SimpleCommit':token,'Content-Type':'application/json'},body:data===undefined?undefined:JSON.stringify(data)});if(!response.ok)throw Error('로컬 서버 응답 오류');return response.json();}
-async function waitReady(){for(let i=0;i<100;i++){if(backend.exitCode!==null)throw Error('로컬 서버가 종료되었습니다.');try{const response=await fetch(origin);const html=await response.text();token=html.match(/name="app-token" content="([^"]+)"/)?.[1];if(response.ok&&token)return;}catch{}await new Promise(resolve=>setTimeout(resolve,200));}throw Error('로컬 서버 시작 시간이 초과되었습니다.');}
 async function quit(){if(checkingQuit||quitting)return;checkingQuit=true;try{const state=await api('state');if(state.busy){await dialog.showMessageBox(window,{type:'info',message:'진행 중인 작업이 끝난 뒤 종료해 주세요.'});return;}}catch{}finally{checkingQuit=false;}quitting=true;app.quit();}
 if(!app.requestSingleInstanceLock()){app.quit();}else{
  app.on('second-instance',()=>{log('SECOND_INSTANCE');openWindow();});
  app.on('activate',openWindow);
  app.on('window-all-closed',()=>{});
- app.on('before-quit',event=>{if(!quitting){event.preventDefault();quit();return;}if(backend&&!backend.killed)backend.kill();});
+ app.on('before-quit',event=>{if(!quitting){event.preventDefault();quit();return;}if(backend)backend.close().catch(error=>log('CLOSE_ERROR '+error.message));});
  app.whenReady().then(async()=>{
     app.setAppUserModelId('io.w0bderful.simplecommit');
     const icon=app.isPackaged?path.join(process.resourcesPath,'app.ico'):path.join(__dirname,'..','app.ico');
-    const executable=app.isPackaged?path.join(process.resourcesPath,'backend','SimpleCommit.Web.exe'):path.join(__dirname,'..','web','SimpleCommit.Web.exe');
-    origin='http://127.0.0.1:'+await port();
-    const args=['--embedded','--tray','--port',new URL(origin).port];
-    if(smoke&&smokeData)args.push('--data',smokeData);
-    backend=spawn(executable,args,{windowsHide:true,stdio:['pipe','ignore','pipe'],env:{...process.env,SIMPLECOMMIT_DESKTOP_EXE:process.env.PORTABLE_EXECUTABLE_FILE||process.execPath,SIMPLECOMMIT_PARENT_PID:String(process.pid)}});
-    backend.on('error',error=>{log('BACKEND_ERROR '+error.message);});
-    backend.on('exit',()=>{if(!quitting){dialog.showErrorBox('SimpleCommit','로컬 서버가 종료되었습니다. 프로그램을 다시 실행해 주세요.');quitting=true;app.quit();}});
-    await waitReady();
+    backend=new Backend({
+      dir:smoke&&smokeData?smokeData:path.join(process.env.LOCALAPPDATA||app.getPath('appData'),'SimpleCommitWeb'),
+      documents:app.getPath('documents'),downloads:app.getPath('downloads'),autoCheck:!smoke,
+      pick:async zip=>{const result=await dialog.showOpenDialog(window,{title:zip?'기존 ZIP 연결':'ZIP 다운로드 폴더',properties:zip?['openFile']:['openDirectory','createDirectory'],...(zip?{filters:[{name:'ZIP 파일',extensions:['zip']}]}:{})});return result.canceled?'':result.filePaths[0]||'';},
+      startup:enabled=>{if(!smoke)app.setLoginItemSettings({name:'SimpleCommitWeb',openAtLogin:enabled,path:process.env.PORTABLE_EXECUTABLE_FILE||process.execPath,args:app.isPackaged?['--tray']:[app.getAppPath(),'--tray']});}
+    });
+    await backend.start();origin=backend.origin;token=backend.token;
+    if(backend.settings.StartWithWindows)backend.startup(true);
     session.defaultSession.setPermissionRequestHandler((contents,permission,callback)=>callback(false));
     session.defaultSession.setPermissionCheckHandler(()=>false);
     window=new BrowserWindow({width:1360,height:900,minWidth:720,minHeight:560,show:false,backgroundColor:'#101513',title:'SimpleCommit',icon,autoHideMenuBar:true,webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});

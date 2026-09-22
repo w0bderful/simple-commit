@@ -1,4 +1,6 @@
 *.pdb
+*.exe
+*.zip
 *.part
 *.tmp
 settings.json

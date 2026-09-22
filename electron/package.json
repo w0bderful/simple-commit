@@ -7,6 +7,7 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
+    "test": "node --test backend.test.cjs",
     "build": "electron-builder --win portable --x64"
   },
   "build": {
@@ -17,13 +18,11 @@
     },
     "files": [
       "main.cjs",
+      "backend.cjs",
+      "www/**/*",
       "package.json"
     ],
     "extraResources": [
-      {
-        "from": "../web/SimpleCommit.Web.exe",
-        "to": "backend/SimpleCommit.Web.exe"
-      },
       {
         "from": "../app.ico",
         "to": "app.ico"
@@ -41,5 +40,8 @@
   "devDependencies": {
     "electron": "^44.4.3",
     "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "yauzl": "^3.4.0"
   }
 }
