@@ -47,3 +47,13 @@ pnpm run build
 - `electron/backend.test.cjs`: 백엔드 회귀 검사
 
 실제 화면 검사는 [Electron 안내](electron/README.md), 검증 범위는 [VALIDATION.md](electron/VALIDATION.md)를 참고하세요.
+
+## 릴리스
+
+소스 변경을 커밋한 뒤 저장소 루트에서 `./release.ps1`을 실행합니다. 현재 버전의 마지막 숫자를 1 올리고 테스트, 빌드, 소스 푸시, 프리뷰 릴리스 게시를 수행합니다. 실행 파일명은 항상 `SimpleCommit.exe`입니다.
+
+- 예: 0.0.1 → 0.0.2 → 0.0.3
+- 이전 릴리스도 삭제: `./release.ps1 -RemovePrevious`
+- 명시적으로 버전 지정: `./release.ps1 -Version 0.0.1 -RemovePrevious`
+
+이미 게시한 버전에는 다시 배포하지 않습니다. 새 릴리스 파일의 해시를 검증한 뒤 요청된 이전 릴리스를 삭제합니다. Git 태그 이력은 보존합니다.
