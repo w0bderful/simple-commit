@@ -12,12 +12,15 @@ using System.Threading.Tasks;
 public static class AppTheme {
     public static string Mode="system";
     public static bool Dark {get{if(Mode!="system")return Mode=="dark";try{return Convert.ToInt32(Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize","AppsUseLightTheme",1))==0;}catch{return false;}}}
-    public static Color Background {get{return Dark?Color.FromArgb(28,30,34):Color.White;}}
+    public static Color Background {get{return Dark?Color.FromArgb(20,23,29):Color.White;}}
+    public static Color Surface {get{return Dark?Color.FromArgb(35,41,51):Color.White;}}
     public static Color Foreground {get{return Dark?Color.FromArgb(232,234,238):Color.FromArgb(35,45,60);}}
     public static void Apply(Control root){
         root.BackColor=Background;root.ForeColor=Foreground;
         var page=root as TabPage;if(page!=null)page.UseVisualStyleBackColor=false;
-        var button=root as Button;if(button!=null){button.UseVisualStyleBackColor=false;button.FlatStyle=FlatStyle.Flat;button.FlatAppearance.BorderColor=Dark?Color.FromArgb(80,84,92):Color.Silver;button.BackColor=Dark?Color.FromArgb(44,47,54):Color.FromArgb(245,246,248);}
+        var button=root as Button;if(button!=null){button.UseVisualStyleBackColor=false;button.FlatStyle=FlatStyle.Flat;button.FlatAppearance.BorderColor=Dark?Color.FromArgb(114,131,154):Color.Silver;button.BackColor=Dark?Color.FromArgb(53,64,80):Color.FromArgb(245,246,248);}
+        if(button!=null){button.FlatAppearance.MouseOverBackColor=Dark?Color.FromArgb(72,89,112):Color.FromArgb(226,234,245);button.FlatAppearance.MouseDownBackColor=Dark?Color.FromArgb(43,91,145):Color.FromArgb(205,222,245);}
+        if(root is ListView||root is TextBoxBase||root is ComboBox||root is NumericUpDown)root.BackColor=Surface;
         var check=root as CheckBox;if(check!=null)check.UseVisualStyleBackColor=false;
         foreach(Control child in root.Controls)Apply(child);
         var form=root as Form;if(form!=null&&form.IsHandleCreated){try{int dark=Dark?1:0;DwmSetWindowAttribute(form.Handle,20,ref dark,4);}catch{}}
@@ -107,7 +110,7 @@ public class MainWindow : Form {
     public MainWindow(bool inTray) {
         Icon=AppVisual.Load(32);
         Text="커밋 알리미"; Font=new Font("맑은 고딕",10); ClientSize=new Size(1120,650); MinimumSize=new Size(1136,630); BackColor=Color.White; StartPosition=FormStartPosition.CenterScreen; AutoScaleMode=AutoScaleMode.Dpi;
-        tabs.Dock=DockStyle.Fill;repositoriesTab.BackColor=Color.White;settingsTab.BackColor=Color.White;tabs.TabPages.AddRange(new[]{repositoriesTab,settingsTab});Controls.Add(tabs);
+        tabs.DrawMode=TabDrawMode.OwnerDrawFixed;tabs.DrawItem+=delegate(object sender,DrawItemEventArgs e){bool active=e.Index==tabs.SelectedIndex;Color fill=AppTheme.Dark?(active?Color.FromArgb(53,74,101):Color.FromArgb(32,38,48)):(active?Color.White:Color.FromArgb(230,234,240));using(var brush=new SolidBrush(fill))e.Graphics.FillRectangle(brush,e.Bounds);TextRenderer.DrawText(e.Graphics,tabs.TabPages[e.Index].Text,Font,e.Bounds,AppTheme.Foreground,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter);if(active)using(var pen=new Pen(AppTheme.Dark?Color.FromArgb(103,176,255):Color.RoyalBlue,3))e.Graphics.DrawLine(pen,e.Bounds.Left+3,e.Bounds.Bottom-2,e.Bounds.Right-3,e.Bounds.Bottom-2);};tabs.Dock=DockStyle.Fill;repositoriesTab.BackColor=Color.White;settingsTab.BackColor=Color.White;tabs.TabPages.AddRange(new[]{repositoriesTab,settingsTab});Controls.Add(tabs);
         Put(new Label{Text="커밋 알리미",Font=new Font("맑은 고딕",20,FontStyle.Bold)},22,15,400,43);
         Put(new Label{Text="여러 저장소의 새 커밋과 내 ZIP 상태를 한눈에 확인하세요."},24,62,1000,27);
         ButtonAt(add,"+ 추가",24,102,82);ButtonAt(bulkAdd,"여러 개 추가",116,102,135);ButtonAt(edit,"수정",261,102,64);ButtonAt(remove,"삭제",335,102,64);
@@ -175,7 +178,7 @@ public class MainWindow : Form {
     void Put(Control c,int x,int y,int w,int h){c.SetBounds(x,y,w,h);repositoriesTab.Controls.Add(c);}
     void LayoutRepositoryTab(){int width=Math.Max(400,repositoriesTab.ClientSize.Width-48),height=repositoriesTab.ClientSize.Height;list.SetBounds(24,193,width,Math.Max(100,height-343));state.SetBounds(24,height-136,width,25);details.SetBounds(24,height-106,width,45);schedule.SetBounds(24,height-47,width,24);}
     void Setting(Control c,int x,int y,int w,int h){c.SetBounds(x,y,w,h);settingsTab.Controls.Add(c);}
-    void ApplyTheme(){AppTheme.Mode=config.Theme;foreach(Form window in Application.OpenForms){if(!(window is ToastWindow))AppTheme.Apply(window);}AppTheme.Apply(this);RefreshList();}
+    void ApplyTheme(){AppTheme.Mode=config.Theme;foreach(Form window in Application.OpenForms){if(!(window is ToastWindow))AppTheme.Apply(window);}AppTheme.Apply(this);tabs.Invalidate();RefreshList();}
     void SetupSettings(){
         Setting(new Label{Text="설정",Font=new Font("맑은 고딕",20,FontStyle.Bold)},24,18,500,42);
         Setting(new Label{Text="자동 확인 간격"},24,82,190,26);Setting(interval,220,78,90,30);Setting(new Label{Text="분 · 실행 중에는 항상 자동 확인"},324,82,650,26);
@@ -211,6 +214,7 @@ public class MainWindow : Form {
             try{var r=Repo.Parse(e.Url);name=r.Name;}catch{}
             row.SubItems[0].Text=name;row.SubItems[1].Text=e.Branch==""?"기본":e.Branch;row.SubItems[2].Text=RelativeTime.Format(e.CommitUtc,DateTime.UtcNow);row.SubItems[3].Text=e.Message==""?"—":e.Message;
             row.SubItems[4].Text=ZipState.Describe(e,File.Exists(e.DownloadedPath));row.SubItems[5].Text=e.Status;
+            Color rowBackground=AppTheme.Dark?(config.Repositories.IndexOf(e)%2==0?AppTheme.Surface:Color.FromArgb(44,52,65)):Color.White;foreach(ListViewItem.ListViewSubItem cell in row.SubItems)cell.BackColor=rowBackground;
             row.ForeColor=e.Status.StartsWith("확인 실패")?(AppTheme.Dark?Color.Salmon:Color.Firebrick):AppTheme.Foreground;
             row.SubItems[4].ForeColor=row.SubItems[4].Text=="ZIP 업데이트 필요"?Color.DarkOrange:row.SubItems[4].Text.StartsWith("최신")?(AppTheme.Dark?Color.LightGreen:Color.ForestGreen):(AppTheme.Dark?Color.Silver:Color.DimGray);row.UseItemStyleForSubItems=false;
             row.ToolTipText=e.Url+"\n"+e.Message+"\n커밋: "+Exact(e.CommitUtc)+"\n마지막 확인: "+Exact(e.CheckedUtc)+"\nZIP 상태는 마지막 성공한 확인 기준입니다.";
@@ -260,7 +264,7 @@ public class MainWindow : Form {
     [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool AllowSetForegroundWindow(int processId);
     [STAThread]public static void Main(string[] args){
         ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
-        if(args.Contains("--theme-ui-test")){testing=true;Application.EnableVisualStyles();using(var f=new MainWindow(false)){f.Show();foreach(string mode in new[]{"dark","light","system"}){f.config.Theme=mode;f.ApplyTheme();Application.DoEvents();if(f.list.BackColor!=AppTheme.Background||f.settingsTab.ForeColor!=AppTheme.Foreground)throw new Exception("Theme colors failed");}f.exiting=true;f.Close();}Console.WriteLine("PASS: dark, light and system theme UI");return;}
+        if(args.Contains("--theme-ui-test")){testing=true;Application.EnableVisualStyles();using(var f=new MainWindow(false)){f.Show();foreach(string mode in new[]{"dark","light","system"}){f.config.Theme=mode;f.ApplyTheme();Application.DoEvents();if(f.list.BackColor!=AppTheme.Surface||f.settingsTab.ForeColor!=AppTheme.Foreground)throw new Exception("Theme colors failed");}f.exiting=true;f.Close();}Console.WriteLine("PASS: dark, light and system theme UI");return;}
         if(args.Contains("--test")){Tests.Run();return;}
         if(args.Length>1&&args[0]=="--settings-ui-test"){
             testing=true;Application.EnableVisualStyles();using(var f=new MainWindow(false)){f.Show();f.tabs.SelectedTab=f.settingsTab;Application.DoEvents();f.noticeSeconds.Value=12;
@@ -307,7 +311,7 @@ public class MainWindow : Form {
             }catch(Exception e){Console.WriteLine(e);Environment.ExitCode=1;}finally{f.exiting=true;f.Close();}};Application.Run(f);return;
         }
         if(args.Length>1&&args[0]=="--probe"){try{var c=Backend.Latest(Repo.Parse(args[1]),"");Console.WriteLine(c.Sha+" | "+c.CommittedUtc.ToString("o")+" | "+RelativeTime.Format(c.CommittedUtc,DateTime.UtcNow));if(args.Length>2)Console.WriteLine(Backend.Download(Repo.Parse(args[1]),c.Sha,args[2],n=>{}));}catch(Exception e){Console.WriteLine(e);Environment.ExitCode=1;}return;}
-        if(args.Length>1&&args[0]=="--ui-test"){testing=true;Application.EnableVisualStyles();using(var f=new MainWindow(false)){f.config.Repositories.Add(new RepoEntry{Url="https://github.com/example/desktop-app",Message="다운로드 안정성 개선",CommitUtc=DateTime.UtcNow.AddMinutes(-7),LastSha=new string('a',40),DownloadedSha=new string('b',40),DownloadedPath=args[1],Status="새 커밋 있음",CheckedUtc=DateTime.UtcNow});f.config.Repositories.Add(new RepoEntry{Url="https://gitgud.io/example/tools",Message="설정 화면 업데이트",CommitUtc=DateTime.UtcNow.AddHours(-2),Status="확인 완료"});f.RefreshList();f.Show();Application.DoEvents();using(var bmp=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(bmp,new Rectangle(0,0,f.Width,f.Height));bmp.Save(args[1]);}f.tray.Dispose();}return;}
+        if(args.Length>1&&args[0]=="--ui-test"){testing=true;Application.EnableVisualStyles();using(var f=new MainWindow(false)){if(args.Contains("--dark")){f.config.Theme="dark";f.ApplyTheme();}f.config.Repositories.Add(new RepoEntry{Url="https://github.com/example/desktop-app",Message="다운로드 안정성 개선",CommitUtc=DateTime.UtcNow.AddMinutes(-7),LastSha=new string('a',40),DownloadedSha=new string('b',40),DownloadedPath=args[1],Status="새 커밋 있음",CheckedUtc=DateTime.UtcNow});f.config.Repositories.Add(new RepoEntry{Url="https://gitgud.io/example/tools",Message="설정 화면 업데이트",CommitUtc=DateTime.UtcNow.AddHours(-2),Status="확인 완료"});f.RefreshList();f.Show();Application.DoEvents();using(var bmp=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(bmp,new Rectangle(0,0,f.Width,f.Height));bmp.Save(args[1]);}f.tray.Dispose();}return;}
         using(var activate=new System.Threading.EventWaitHandle(false,System.Threading.EventResetMode.AutoReset,@"Local\SimpleCommitActivate")){
             bool created;using(var mutex=new System.Threading.Mutex(true,@"Local\SimpleCommitApp",out created)){
                 if(!created){AllowSetForegroundWindow(-1);activate.Set();return;}
