@@ -96,5 +96,5 @@ if(!app.requestSingleInstanceLock()){app.quit();}else{
       second.on('error',e=>log('SECOND_ERROR '+e.message));
       setTimeout(()=>{quitting=true;app.quit();},15000);
     }
- }).catch(error=>{log('ERROR '+error.stack);dialog.showErrorBox('SimpleCommit 시작 실패',error.message);quitting=true;app.quit();});
+ }).catch(error=>{log('ERROR '+error.stack);if(!smoke)dialog.showErrorBox('SimpleCommit 시작 실패',error.message);quitting=true;app.quit();});
 }
