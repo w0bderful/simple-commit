@@ -25,3 +25,4 @@ a,.toolbar-icon{transition:color .2s ease,background-color .2s ease}
 dialog::backdrop{transition:opacity .2s ease,display .2s allow-discrete,overlay .2s allow-discrete}
 @starting-style{dialog[open]::backdrop{opacity:0}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+.brand-link{transition:color .2s ease}.brand-link:hover{color:var(--accent)}
