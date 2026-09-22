@@ -9,6 +9,21 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
+public static class AppTheme {
+    public static string Mode="system";
+    public static bool Dark {get{if(Mode!="system")return Mode=="dark";try{return Convert.ToInt32(Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize","AppsUseLightTheme",1))==0;}catch{return false;}}}
+    public static Color Background {get{return Dark?Color.FromArgb(28,30,34):Color.White;}}
+    public static Color Foreground {get{return Dark?Color.FromArgb(232,234,238):Color.FromArgb(35,45,60);}}
+    public static void Apply(Control root){
+        root.BackColor=Background;root.ForeColor=Foreground;
+        var page=root as TabPage;if(page!=null)page.UseVisualStyleBackColor=false;
+        var button=root as Button;if(button!=null){button.UseVisualStyleBackColor=false;button.FlatStyle=FlatStyle.Flat;button.FlatAppearance.BorderColor=Dark?Color.FromArgb(80,84,92):Color.Silver;button.BackColor=Dark?Color.FromArgb(44,47,54):Color.FromArgb(245,246,248);}
+        var check=root as CheckBox;if(check!=null)check.UseVisualStyleBackColor=false;
+        foreach(Control child in root.Controls)Apply(child);
+        var form=root as Form;if(form!=null&&form.IsHandleCreated){try{int dark=Dark?1:0;DwmSetWindowAttribute(form.Handle,20,ref dark,4);}catch{}}
+    }
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr handle,int attribute,ref int value,int size);
+}
 public static class AppVisual {
     public static Icon Load(int size){using(var s=typeof(AppVisual).Assembly.GetManifestResourceStream("app.ico")){return s==null?(Icon)SystemIcons.Information.Clone():new Icon(s,size,size);}}
 }
@@ -20,7 +35,7 @@ public class RepoDialog : Form {
     public string RepoUrl {get{return url.Text.Trim();}}
     public string Branch {get{var selected=branch.SelectedItem as Choice;return selected!=null?selected.Name:branch.Text.Trim();}}
     public string Folder {get{return folder.Text;}}
-    public RepoDialog(RepoEntry entry,string defaultFolder=null) {
+    public RepoDialog(RepoEntry entry,string defaultFolder=null) { Shown+=delegate{AppTheme.Apply(this);};
         Icon=AppVisual.Load(32);
         Text=entry==null ? "저장소 추가" : "저장소 수정"; Font=new Font("맑은 고딕",10); ClientSize=new Size(560,335); FormBorderStyle=FormBorderStyle.FixedDialog; MaximizeBox=false; MinimizeBox=false; StartPosition=FormStartPosition.CenterParent;
         Add(new Label{Text="저장소 주소 (GitHub · GitGud · Codeberg · GitLab)"},20,16,520,25); Add(url,20,43,520,28);
@@ -129,7 +144,9 @@ public class MainWindow : Form {
         interval.ValueChanged+=delegate{config.CheckMinutes=(int)interval.Value;foreach(var e in config.Repositories)e.NextUtc=DateTime.UtcNow.AddMinutes(config.CheckMinutes);Save();RefreshSchedule();settingsStatus.Text="자동 확인 간격을 "+config.CheckMinutes+"분으로 저장했습니다.";};
         startup.Text="윈도우 시작 시 트레이에서 자동 실행"; startup.Checked=config.StartWithWindows;
         startup.CheckedChanged+=delegate{config.StartWithWindows=startup.Checked;RegisterStartup();Save();};
-        SetupSettings();
+        AppTheme.Mode=config.Theme;SetupSettings();ApplyTheme();
+        Microsoft.Win32.UserPreferenceChangedEventHandler themeChanged=delegate{if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)delegate{if(config.Theme=="system")ApplyTheme();});};
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged+=themeChanged;FormClosed+=delegate{Microsoft.Win32.SystemEvents.UserPreferenceChanged-=themeChanged;};Shown+=delegate{ApplyTheme();};
         tray.Icon=AppVisual.Load(16);tray.Text="커밋 알리미";tray.Visible=true;
         var menu=new ContextMenuStrip();menu.Items.Add("열기",null,delegate{Restore();});menu.Items.Add("종료",null,delegate{if(busy){Restore();MessageBox.Show(this,"진행 중인 작업이 끝난 뒤 종료해 주세요.");return;}exiting=true;Close();});tray.ContextMenuStrip=menu;tray.DoubleClick+=delegate{Restore();};
         list.SelectedIndexChanged+=delegate{RefreshDetails();};
@@ -158,6 +175,7 @@ public class MainWindow : Form {
     void Put(Control c,int x,int y,int w,int h){c.SetBounds(x,y,w,h);repositoriesTab.Controls.Add(c);}
     void LayoutRepositoryTab(){int width=Math.Max(400,repositoriesTab.ClientSize.Width-48),height=repositoriesTab.ClientSize.Height;list.SetBounds(24,193,width,Math.Max(100,height-343));state.SetBounds(24,height-136,width,25);details.SetBounds(24,height-106,width,45);schedule.SetBounds(24,height-47,width,24);}
     void Setting(Control c,int x,int y,int w,int h){c.SetBounds(x,y,w,h);settingsTab.Controls.Add(c);}
+    void ApplyTheme(){AppTheme.Mode=config.Theme;foreach(Form window in Application.OpenForms){if(!(window is ToastWindow))AppTheme.Apply(window);}AppTheme.Apply(this);RefreshList();}
     void SetupSettings(){
         Setting(new Label{Text="설정",Font=new Font("맑은 고딕",20,FontStyle.Bold)},24,18,500,42);
         Setting(new Label{Text="자동 확인 간격"},24,82,190,26);Setting(interval,220,78,90,30);Setting(new Label{Text="분 · 실행 중에는 항상 자동 확인"},324,82,650,26);
@@ -171,7 +189,8 @@ public class MainWindow : Form {
         var preview=new Button{Text="알림 미리보기"};Setting(preview,375,316,170,36);preview.Click+=delegate{ShowNotice("새 커밋 알림","화면 오른쪽 아래에 표시되는 자체 알림입니다.\n클릭하면 저장소 목록을 엽니다.",true);};
         Setting(new Label{Text="오른쪽 아래에 표시 · 클릭하면 목록 열기 · ×로 바로 닫기",ForeColor=Color.DimGray},24,365,1010,26);
         link.Text="선택 저장소 ZIP 수동 연결";Setting(link,24,419,260,36);Setting(linkSetting,300,425,740,28);
-        Setting(new Label{Text="기존 ZIP은 자동 탐색합니다. 직접 연결이 필요할 때만 사용하세요.",ForeColor=Color.DimGray},24,467,1010,26);Setting(settingsStatus,24,535,1010,45);
+        Setting(new Label{Text="기존 ZIP은 자동 탐색합니다. 직접 연결이 필요할 때만 사용하세요.",ForeColor=Color.DimGray},24,467,1010,26);Setting(settingsStatus,24,550,1010,40);
+        Setting(new Label{Text="테마"},24,510,190,26);var theme=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};theme.Items.AddRange(new object[]{"시스템 설정 따르기","다크","화이트"});theme.SelectedIndex=config.Theme=="dark"?1:config.Theme=="light"?2:0;Setting(theme,220,505,240,30);theme.SelectedIndexChanged+=delegate{config.Theme=new[]{"system","dark","light"}[theme.SelectedIndex];ApplyTheme();Save();settingsStatus.Text="테마를 저장했습니다.";};
     }
     void ButtonAt(Button b,string text,int x,int y,int w){b.Text=text;Put(b,x,y,w,36);}
     void Restore(){Show();WindowState=FormWindowState.Normal;Activate();}
@@ -192,8 +211,8 @@ public class MainWindow : Form {
             try{var r=Repo.Parse(e.Url);name=r.Name;}catch{}
             row.SubItems[0].Text=name;row.SubItems[1].Text=e.Branch==""?"기본":e.Branch;row.SubItems[2].Text=RelativeTime.Format(e.CommitUtc,DateTime.UtcNow);row.SubItems[3].Text=e.Message==""?"—":e.Message;
             row.SubItems[4].Text=ZipState.Describe(e,File.Exists(e.DownloadedPath));row.SubItems[5].Text=e.Status;
-            row.ForeColor=e.Status.StartsWith("확인 실패")?Color.Firebrick:Color.FromArgb(35,45,60);
-            row.SubItems[4].ForeColor=row.SubItems[4].Text=="ZIP 업데이트 필요"?Color.DarkOrange:row.SubItems[4].Text.StartsWith("최신")?Color.ForestGreen:Color.DimGray;row.UseItemStyleForSubItems=false;
+            row.ForeColor=e.Status.StartsWith("확인 실패")?(AppTheme.Dark?Color.Salmon:Color.Firebrick):AppTheme.Foreground;
+            row.SubItems[4].ForeColor=row.SubItems[4].Text=="ZIP 업데이트 필요"?Color.DarkOrange:row.SubItems[4].Text.StartsWith("최신")?(AppTheme.Dark?Color.LightGreen:Color.ForestGreen):(AppTheme.Dark?Color.Silver:Color.DimGray);row.UseItemStyleForSubItems=false;
             row.ToolTipText=e.Url+"\n"+e.Message+"\n커밋: "+Exact(e.CommitUtc)+"\n마지막 확인: "+Exact(e.CheckedUtc)+"\nZIP 상태는 마지막 성공한 확인 기준입니다.";
         }list.EndUpdate();list.ListViewItemSorter=new RowOrder(config.Repositories);list.Sort();refreshing=false;if(selected!=null)Select(selected);RefreshDetails();RefreshSchedule();
     }
@@ -241,6 +260,7 @@ public class MainWindow : Form {
     [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool AllowSetForegroundWindow(int processId);
     [STAThread]public static void Main(string[] args){
         ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
+        if(args.Contains("--theme-ui-test")){testing=true;Application.EnableVisualStyles();using(var f=new MainWindow(false)){f.Show();foreach(string mode in new[]{"dark","light","system"}){f.config.Theme=mode;f.ApplyTheme();Application.DoEvents();if(f.list.BackColor!=AppTheme.Background||f.settingsTab.ForeColor!=AppTheme.Foreground)throw new Exception("Theme colors failed");}f.exiting=true;f.Close();}Console.WriteLine("PASS: dark, light and system theme UI");return;}
         if(args.Contains("--test")){Tests.Run();return;}
         if(args.Length>1&&args[0]=="--settings-ui-test"){
             testing=true;Application.EnableVisualStyles();using(var f=new MainWindow(false)){f.Show();f.tabs.SelectedTab=f.settingsTab;Application.DoEvents();f.noticeSeconds.Value=12;

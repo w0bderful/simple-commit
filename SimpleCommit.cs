@@ -41,6 +41,7 @@ public class Settings {
     public int NotificationSeconds=7;
     public bool KeepNotificationUntilDismissed=true;
     public bool TrayHintShown=false;
+    public string Theme="system";
     public bool SortRecent=false;
     public List<RepoEntry> Repositories = new List<RepoEntry>();
     public string Url = "", Branch = "", Folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -49,6 +50,7 @@ public class Settings {
     public bool StartWithWindows = true;
     public DateTime NextUtc = DateTime.MinValue;
     public void Migrate() {
+        if(Theme!="dark"&&Theme!="light")Theme="system";
         CheckMinutes=Math.Max(1,Math.Min(10080,CheckMinutes));Watching=true;
         NotificationSeconds=Math.Max(1,Math.Min(120,NotificationSeconds));
         if (Repositories == null) Repositories = new List<RepoEntry>();

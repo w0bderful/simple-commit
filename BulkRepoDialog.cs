@@ -21,7 +21,7 @@ public class BulkRepoDialog:Form {
     TextBox links=new TextBox(),folder=new TextBox(),problems=new TextBox();Label summary=new Label();Button register=new Button();
     public List<string> Urls=new List<string>();
     public string Folder {get{return folder.Text;}}
-    public BulkRepoDialog(string defaultFolder){
+    public BulkRepoDialog(string defaultFolder){Shown+=delegate{AppTheme.Apply(this);};
         Text="저장소 여러 개 추가";Icon=AppVisual.Load(32);Font=new Font("맑은 고딕",10);ClientSize=new Size(650,530);MinimumSize=new Size(550,500);StartPosition=FormStartPosition.CenterParent;
         Add(new Label{Text="저장소 링크를 한 줄에 하나씩 붙여 넣으세요."},20,16,610,26);
         Add(new Label{Text="GitHub · GitGud · Codeberg · GitLab / 브랜치는 각 저장소의 기본값"},20,44,610,26);
