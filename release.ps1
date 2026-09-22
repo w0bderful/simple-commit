@@ -47,8 +47,8 @@ do {
     Start-Sleep -Milliseconds 500
     $text=if(Test-Path -LiteralPath $log){[IO.File]::ReadAllText($log)}else{''}
     if($text -match 'ERROR '){throw "Packaged UI test failed: $text"}
-}while(($text -notmatch 'UI_CHECKS' -or $text -notmatch 'SECOND_INSTANCE') -and (Get-Date) -lt $deadline)
-if($text -notmatch 'UI_CHECKS' -or $text -notmatch ('"version":"'+[regex]::Escape($Version)+'"') -or $text -notmatch 'SECOND_INSTANCE'){throw 'Packaged UI test timed out or version mismatch.'}
+}while(($text -notmatch 'UI_CHECKS' -or $text -notmatch 'RELAUNCH_RESTORE_PASS') -and (Get-Date) -lt $deadline)
+if($text -notmatch 'UI_CHECKS' -or $text -notmatch ('"version":"'+[regex]::Escape($Version)+'"') -or $text -notmatch 'RELAUNCH_RESTORE_PASS'){throw 'Packaged UI test timed out or version mismatch.'}
 Write-Output "Packaged UI tests passed for $tag"
 $zip=Join-Path $PSScriptRoot "electron/dist/SimpleCommit-$Version-Windows.zip"
 Compress-Archive -LiteralPath @($exe,(Join-Path $PSScriptRoot '사용법.txt')) -DestinationPath $zip -Force
