@@ -10,7 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 
 public class MaterialButton:Button {
-    bool hover,pressed;
+    bool hover,pressed;public bool SelectedStyle;
     public MaterialButton(){FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;Cursor=Cursors.Hand;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);}
     protected override void OnMouseEnter(EventArgs e){hover=true;Invalidate();base.OnMouseEnter(e);}
     protected override void OnMouseLeave(EventArgs e){hover=pressed=false;Invalidate();base.OnMouseLeave(e);}
@@ -19,25 +19,37 @@ public class MaterialButton:Button {
     protected override void OnPaint(PaintEventArgs e){
         e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         e.Graphics.Clear(Parent==null?AppTheme.Background:Parent.BackColor);
-        bool primary=Text.Contains("다운로드")||Text=="+ 추가"||Text=="저장";
+        bool primary=SelectedStyle||Text.Contains("다운로드")||Text=="+ 추가"||Text=="저장";
         Color fill=!Enabled?Color.FromArgb(226,231,228):primary?(pressed?Color.FromArgb(0,77,64):hover?Color.FromArgb(0,105,86):AppTheme.Primary):(pressed?Color.FromArgb(185,218,206):hover?Color.FromArgb(205,231,219):Color.FromArgb(226,241,233));
+        if(AppTheme.Dark)fill=!Enabled?Color.FromArgb(44,48,47):primary?(pressed?Color.FromArgb(99,191,164):Color.FromArgb(139,219,193)):(pressed?Color.FromArgb(58,79,70):hover?Color.FromArgb(48,65,58):Color.FromArgb(36,47,42));
         var r=new Rectangle(1,1,Math.Max(1,Width-3),Math.Max(1,Height-3));int d=Math.Min(20,r.Height);
         using(var path=new System.Drawing.Drawing2D.GraphicsPath()){path.AddArc(r.Left,r.Top,d,d,180,90);path.AddArc(r.Right-d,r.Top,d,d,270,90);path.AddArc(r.Right-d,r.Bottom-d,d,d,0,90);path.AddArc(r.Left,r.Bottom-d,d,d,90,90);path.CloseFigure();using(var brush=new SolidBrush(fill))e.Graphics.FillPath(brush,path);if(Focused)using(var pen=new Pen(AppTheme.Primary,2))e.Graphics.DrawPath(pen,path);}
-        TextRenderer.DrawText(e.Graphics,Text,Font,r,!Enabled?Color.FromArgb(112,124,118):primary?Color.White:AppTheme.Primary,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(e.Graphics,Text,Font,r,!Enabled?(AppTheme.Dark?Color.FromArgb(153,163,157):Color.FromArgb(112,124,118)):primary?(AppTheme.Dark?Color.FromArgb(0,55,42):Color.White):AppTheme.Primary,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis);
     }
 }
 public static class AppTheme {
-    public static Color Primary=Color.FromArgb(0,112,91);
-    public static Color Background=Color.FromArgb(244,248,245);
-    public static Color Surface=Color.White;
-    public static Color Foreground=Color.FromArgb(30,48,40);
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr handle,int attribute,ref int value,int size);
+    public static bool Dark;
+    public static Color Primary {get{return Dark?Color.FromArgb(139,219,193):Color.FromArgb(0,112,91);}}
+    public static Color Background {get{return Dark?Color.FromArgb(17,20,19):Color.FromArgb(244,248,245);}}
+    public static Color Surface {get{return Dark?Color.FromArgb(29,35,32):Color.White;}}
+    public static Color Foreground {get{return Dark?Color.FromArgb(226,234,228):Color.FromArgb(30,48,40);}}
     public static void Apply(Control root){
         root.BackColor=Background;root.ForeColor=Foreground;
         var page=root as TabPage;if(page!=null)page.UseVisualStyleBackColor=false;
         if(root is ListView||root is TextBoxBase||root is ComboBox||root is NumericUpDown)root.BackColor=Surface;
         var check=root as CheckBox;if(check!=null)check.UseVisualStyleBackColor=false;
         foreach(Control child in root.Controls)Apply(child);
+        var form=root as Form;if(form!=null&&form.IsHandleCreated){try{int dark=Dark?1:0;DwmSetWindowAttribute(form.Handle,20,ref dark,4);}catch{}}
     }
+}
+public class MaterialTabs:Panel {
+    readonly Panel bar=new Panel{Dock=DockStyle.Top,Height=58};
+    readonly Panel content=new Panel{Dock=DockStyle.Fill};
+    readonly MaterialButton first=new MaterialButton{Text="저장소",Bounds=new Rectangle(20,10,112,38)},second=new MaterialButton{Text="설정",Bounds=new Rectangle(140,10,112,38)};
+    Panel selected;
+    public Panel SelectedTab {get{return selected;}set{selected=value;foreach(Control page in content.Controls)page.Visible=page==value;first.SelectedStyle=content.Controls.IndexOf(value)==0;second.SelectedStyle=!first.SelectedStyle;bar.Invalidate(true);}}
+    public void Initialize(Panel repositories,Panel settings){Controls.Add(content);Controls.Add(bar);bar.Controls.Add(first);bar.Controls.Add(second);repositories.Dock=settings.Dock=DockStyle.Fill;content.Controls.Add(repositories);content.Controls.Add(settings);first.Click+=delegate{SelectedTab=repositories;};second.Click+=delegate{SelectedTab=settings;};SelectedTab=repositories;}
 }
 public static class AppVisual {
     public static Icon Load(int size){using(var s=typeof(AppVisual).Assembly.GetManifestResourceStream("app.ico")){return s==null?(Icon)SystemIcons.Information.Clone():new Icon(s,size,size);}}
@@ -115,14 +127,14 @@ public class MainWindow : Form {
     NumericUpDown interval=new NumericUpDown();
     Button selectAll=new MaterialButton(),selectNone=new MaterialButton(),defaultFolder=new MaterialButton(),bulkAdd=new MaterialButton(),sortRecent=new MaterialButton(); Label selectedCount=new Label();
     CheckBox startup=new CheckBox(); NotifyIcon tray=new NotifyIcon(); Timer timer=new Timer();
-    TabControl tabs=new TabControl();TabPage repositoriesTab=new TabPage("저장소"),settingsTab=new TabPage("설정");
+    MaterialTabs tabs=new MaterialTabs();Panel repositoriesTab=new Panel(),settingsTab=new Panel();
     NumericUpDown noticeSeconds=new NumericUpDown();Label folderSetting=new Label(),linkSetting=new Label(),settingsStatus=new Label();ToastWindow notification;
     bool storageReadFailed;
     string configFile=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"SimpleCommit","settings.json");
     public MainWindow(bool inTray) {
         Icon=AppVisual.Load(32);
         Text="커밋 알리미"; Font=new Font("맑은 고딕",10); ClientSize=new Size(1120,650); MinimumSize=new Size(1136,630); BackColor=Color.White; StartPosition=FormStartPosition.CenterScreen; AutoScaleMode=AutoScaleMode.Dpi;
-        tabs.ItemSize=new Size(110,40);tabs.SizeMode=TabSizeMode.Fixed;tabs.DrawMode=TabDrawMode.OwnerDrawFixed;tabs.DrawItem+=delegate(object sender,DrawItemEventArgs e){bool active=e.Index==tabs.SelectedIndex;Color fill=active?Color.FromArgb(210,235,223):AppTheme.Background;using(var brush=new SolidBrush(fill))e.Graphics.FillRectangle(brush,e.Bounds);TextRenderer.DrawText(e.Graphics,tabs.TabPages[e.Index].Text,Font,e.Bounds,AppTheme.Foreground,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter);if(active)using(var pen=new Pen(AppTheme.Primary,3))e.Graphics.DrawLine(pen,e.Bounds.Left+3,e.Bounds.Bottom-2,e.Bounds.Right-3,e.Bounds.Bottom-2);};tabs.Dock=DockStyle.Fill;repositoriesTab.BackColor=Color.White;settingsTab.BackColor=Color.White;tabs.TabPages.AddRange(new[]{repositoriesTab,settingsTab});Controls.Add(tabs);
+        tabs.Dock=DockStyle.Fill;tabs.Initialize(repositoriesTab,settingsTab);Controls.Add(tabs);
         Put(new Label{Text="커밋 알리미",Font=new Font("맑은 고딕",20,FontStyle.Bold)},22,15,400,43);
         Put(new Label{Text="여러 저장소의 새 커밋과 내 ZIP 상태를 한눈에 확인하세요."},24,62,1000,27);
         ButtonAt(add,"+ 추가",24,102,82);ButtonAt(bulkAdd,"여러 개 추가",116,102,135);ButtonAt(edit,"수정",261,102,64);ButtonAt(remove,"삭제",335,102,64);
@@ -133,7 +145,7 @@ public class MainWindow : Form {
         defaultFolder.Click+=delegate{using(var d=new FolderBrowserDialog{SelectedPath=config.DefaultDownloadFolder,Description="새 저장소에 사용할 기본 다운로드 폴더"})if(d.ShowDialog(this)==DialogResult.OK){config.DefaultDownloadFolder=d.SelectedPath;Save();folderSetting.Text=d.SelectedPath;settingsStatus.Text="기본 폴더 저장 완료 · 새 저장소부터 적용됩니다.";}};
         selectAll.Click+=delegate{foreach(var e in config.Repositories)e.DownloadSelected=true;Save();RefreshList();};
         selectNone.Click+=delegate{foreach(var e in config.Repositories)e.DownloadSelected=false;Save();RefreshList();};
-        list.View=View.Details; list.FullRowSelect=true; list.MultiSelect=false; list.HideSelection=false; list.GridLines=false; list.ShowItemToolTips=true;list.CheckBoxes=true;
+        list.OwnerDraw=true;list.DrawColumnHeader+=delegate(object sender,DrawListViewColumnHeaderEventArgs e){using(var brush=new SolidBrush(AppTheme.Dark?Color.FromArgb(43,57,49):Color.FromArgb(226,241,233)))e.Graphics.FillRectangle(brush,e.Bounds);TextRenderer.DrawText(e.Graphics,e.Header.Text,Font,Rectangle.Inflate(e.Bounds,-6,0),AppTheme.Foreground,TextFormatFlags.Left|TextFormatFlags.VerticalCenter);};list.DrawItem+=delegate(object sender,DrawListViewItemEventArgs e){e.DrawDefault=true;};list.DrawSubItem+=delegate(object sender,DrawListViewSubItemEventArgs e){e.DrawDefault=true;};list.View=View.Details; list.FullRowSelect=true; list.MultiSelect=false; list.HideSelection=false; list.GridLines=false; list.ShowItemToolTips=true;list.CheckBoxes=true;
         list.ItemCheck+=delegate(object sender,ItemCheckEventArgs e){if(refreshing)return;if(busy){e.NewValue=e.CurrentValue;return;}var entry=list.Items[e.Index].Tag as RepoEntry;if(entry!=null){entry.DownloadSelected=e.NewValue==CheckState.Checked;Save();RefreshDetails();}};
         list.AllowDrop=true;list.InsertionMark.Color=Color.RoyalBlue;
         list.ItemDrag+=delegate(object sender,ItemDragEventArgs e){if(busy||e.Button!=MouseButtons.Left)return;var row=e.Item as ListViewItem;if(row==null)return;dragging=true;try{list.DoDragDrop(new DataObject("SimpleCommit.RepositoryId",((RepoEntry)row.Tag).Id),DragDropEffects.Move);}finally{dragging=false;list.InsertionMark.Index=-1;}};
@@ -189,7 +201,7 @@ public class MainWindow : Form {
     void Put(Control c,int x,int y,int w,int h){c.SetBounds(x,y,w,h);repositoriesTab.Controls.Add(c);}
     void LayoutRepositoryTab(){int width=Math.Max(400,repositoriesTab.ClientSize.Width-48),height=repositoriesTab.ClientSize.Height;list.SetBounds(24,193,width,Math.Max(100,height-343));state.SetBounds(24,height-136,width,25);details.SetBounds(24,height-106,width,45);schedule.SetBounds(24,height-47,width,24);}
     void Setting(Control c,int x,int y,int w,int h){c.SetBounds(x,y,w,h);settingsTab.Controls.Add(c);}
-    void ApplyTheme(){foreach(Form window in Application.OpenForms){if(!(window is ToastWindow))AppTheme.Apply(window);}AppTheme.Apply(this);tabs.Invalidate();RefreshList();}
+    void ApplyTheme(){AppTheme.Dark=config.MaterialDark;foreach(Form window in Application.OpenForms){if(!(window is ToastWindow))AppTheme.Apply(window);}AppTheme.Apply(this);tabs.Invalidate();RefreshList();}
     void SetupSettings(){
         Setting(new Label{Text="설정",Font=new Font("맑은 고딕",20,FontStyle.Bold)},24,18,500,42);
         Setting(new Label{Text="자동 확인 간격"},24,82,190,26);Setting(interval,220,78,90,30);Setting(new Label{Text="분 · 실행 중에는 항상 자동 확인"},324,82,650,26);
@@ -204,6 +216,7 @@ public class MainWindow : Form {
         Setting(new Label{Text="오른쪽 아래에 표시 · 클릭하면 목록 열기 · ×로 바로 닫기",ForeColor=Color.DimGray},24,365,1010,26);
         link.Text="선택 저장소 ZIP 수동 연결";Setting(link,24,419,260,36);Setting(linkSetting,300,425,740,28);
         Setting(new Label{Text="기존 ZIP은 자동 탐색합니다. 직접 연결이 필요할 때만 사용하세요.",ForeColor=Color.DimGray},24,467,1010,26);Setting(settingsStatus,24,550,1010,40);
+        Setting(new Label{Text="머터리얼 테마"},24,509,190,26);var theme=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};theme.Items.AddRange(new object[]{"밝은 머터리얼","검은색 머터리얼"});theme.SelectedIndex=config.MaterialDark?1:0;Setting(theme,220,505,240,30);theme.SelectedIndexChanged+=delegate{config.MaterialDark=theme.SelectedIndex==1;ApplyTheme();Save();settingsStatus.Text="머터리얼 테마를 저장했습니다.";};
     }
     void ButtonAt(Button b,string text,int x,int y,int w){b.Text=text;Put(b,x,y,w,36);}
     void Restore(){Show();WindowState=FormWindowState.Normal;Activate();}
@@ -224,9 +237,9 @@ public class MainWindow : Form {
             try{var r=Repo.Parse(e.Url);name=r.Name;}catch{}
             row.SubItems[0].Text=name;row.SubItems[1].Text=e.Branch==""?"기본":e.Branch;row.SubItems[2].Text=RelativeTime.Format(e.CommitUtc,DateTime.UtcNow);row.SubItems[3].Text=e.Message==""?"—":e.Message;
             row.SubItems[4].Text=ZipState.Describe(e,File.Exists(e.DownloadedPath));row.SubItems[5].Text=e.Status;
-            Color rowBackground=config.Repositories.IndexOf(e)%2==0?AppTheme.Surface:Color.FromArgb(239,246,241);foreach(ListViewItem.ListViewSubItem cell in row.SubItems)cell.BackColor=rowBackground;
-            row.ForeColor=e.Status.StartsWith("확인 실패")?Color.Firebrick:AppTheme.Foreground;
-            row.SubItems[4].ForeColor=row.SubItems[4].Text=="ZIP 업데이트 필요"?Color.DarkOrange:row.SubItems[4].Text.StartsWith("최신")?AppTheme.Primary:Color.DimGray;row.UseItemStyleForSubItems=false;
+            Color rowBackground=config.Repositories.IndexOf(e)%2==0?AppTheme.Surface:(AppTheme.Dark?Color.FromArgb(38,46,41):Color.FromArgb(239,246,241));foreach(ListViewItem.ListViewSubItem cell in row.SubItems)cell.BackColor=rowBackground;
+            row.ForeColor=e.Status.StartsWith("확인 실패")?(AppTheme.Dark?Color.Salmon:Color.Firebrick):AppTheme.Foreground;
+            row.SubItems[4].ForeColor=row.SubItems[4].Text=="ZIP 업데이트 필요"?Color.DarkOrange:row.SubItems[4].Text.StartsWith("최신")?AppTheme.Primary:(AppTheme.Dark?Color.Silver:Color.DimGray);row.UseItemStyleForSubItems=false;
             row.ToolTipText=e.Url+"\n"+e.Message+"\n커밋: "+Exact(e.CommitUtc)+"\n마지막 확인: "+Exact(e.CheckedUtc)+"\nZIP 상태는 마지막 성공한 확인 기준입니다.";
         }list.EndUpdate();list.ListViewItemSorter=new RowOrder(config.Repositories);list.Sort();refreshing=false;if(selected!=null)Select(selected);RefreshDetails();RefreshSchedule();
     }
@@ -320,7 +333,7 @@ public class MainWindow : Form {
             }catch(Exception e){Console.WriteLine(e);Environment.ExitCode=1;}finally{f.exiting=true;f.Close();}};Application.Run(f);return;
         }
         if(args.Length>1&&args[0]=="--probe"){try{var c=Backend.Latest(Repo.Parse(args[1]),"");Console.WriteLine(c.Sha+" | "+c.CommittedUtc.ToString("o")+" | "+RelativeTime.Format(c.CommittedUtc,DateTime.UtcNow));if(args.Length>2)Console.WriteLine(Backend.Download(Repo.Parse(args[1]),c.Sha,args[2],n=>{}));}catch(Exception e){Console.WriteLine(e);Environment.ExitCode=1;}return;}
-        if(args.Length>1&&args[0]=="--ui-test"){testing=true;Application.EnableVisualStyles();using(var f=new MainWindow(false)){f.config.Repositories.Add(new RepoEntry{Url="https://github.com/example/desktop-app",Message="다운로드 안정성 개선",CommitUtc=DateTime.UtcNow.AddMinutes(-7),LastSha=new string('a',40),DownloadedSha=new string('b',40),DownloadedPath=args[1],Status="새 커밋 있음",CheckedUtc=DateTime.UtcNow});f.config.Repositories.Add(new RepoEntry{Url="https://gitgud.io/example/tools",Message="설정 화면 업데이트",CommitUtc=DateTime.UtcNow.AddHours(-2),Status="확인 완료"});f.RefreshList();f.Show();Application.DoEvents();using(var bmp=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(bmp,new Rectangle(0,0,f.Width,f.Height));bmp.Save(args[1]);}f.tray.Dispose();}return;}
+        if(args.Length>1&&args[0]=="--ui-test"){testing=true;Application.EnableVisualStyles();using(var f=new MainWindow(false)){f.config.MaterialDark=args.Contains("--dark");f.ApplyTheme();f.config.Repositories.Add(new RepoEntry{Url="https://github.com/example/desktop-app",Message="다운로드 안정성 개선",CommitUtc=DateTime.UtcNow.AddMinutes(-7),LastSha=new string('a',40),DownloadedSha=new string('b',40),DownloadedPath=args[1],Status="새 커밋 있음",CheckedUtc=DateTime.UtcNow});f.config.Repositories.Add(new RepoEntry{Url="https://gitgud.io/example/tools",Message="설정 화면 업데이트",CommitUtc=DateTime.UtcNow.AddHours(-2),Status="확인 완료"});f.RefreshList();f.Show();Application.DoEvents();using(var bmp=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(bmp,new Rectangle(0,0,f.Width,f.Height));bmp.Save(args[1]);}f.tray.Dispose();}return;}
         using(var activate=new System.Threading.EventWaitHandle(false,System.Threading.EventResetMode.AutoReset,@"Local\SimpleCommitActivate")){
             bool created;using(var mutex=new System.Threading.Mutex(true,@"Local\SimpleCommitApp",out created)){
                 if(!created){AllowSetForegroundWindow(-1);activate.Set();return;}
