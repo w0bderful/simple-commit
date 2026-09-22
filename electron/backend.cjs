@@ -324,7 +324,7 @@ class Backend {
         }
         if (req.method !== 'GET') return reply(405, {});
         const name = pathname === '/' ? 'index.html' : pathname.slice(1);
-        const types = {'index.html': 'text/html; charset=utf-8', 'app.js': 'text/javascript; charset=utf-8', 'style.css': 'text/css; charset=utf-8', 'icon.png': 'image/png'};
+        const types = {'index.html': 'text/html; charset=utf-8', 'app.js': 'text/javascript; charset=utf-8', 'style.css': 'text/css; charset=utf-8', 'icon.png': 'image/png', 'theme.svg': 'image/svg+xml', 'bell.svg': 'image/svg+xml'};
         if (!types[name]) return reply(404, {});
         let content = fs.readFileSync(path.join(__dirname, 'www', name));
         if (name === 'index.html') content = content.toString('utf8').replace('__TOKEN__', this.token);

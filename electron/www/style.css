@@ -13,3 +13,6 @@
 #rows .branch{margin-top:3px;padding:1px 5px}
 #rows .row-more{font-size:20px;padding:2px 8px}
 #test-notice{margin-top:14px}
+.topbar .icon-button{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;padding:9px;color:var(--text)}
+.toolbar-icon{display:block;width:22px;height:22px;background:currentColor;mask-position:center;mask-repeat:no-repeat;mask-size:contain}
+.theme-icon{mask-image:url('/theme.svg')}.bell-icon{mask-image:url('/bell.svg')}
