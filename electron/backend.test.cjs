@@ -150,6 +150,15 @@ test('shared previous file and destination collision are protected', async t => 
   other.DownloadedPath=e.DownloadedPath;e.DownloadedPath=old;e.DownloadedSha=NEXT;fs.unlinkSync(other.DownloadedPath);
   await backend.api('run',{download:true}); await backend.job; assert.match(e.Status,/파일명이 같습니다/);
 });
+test('desktop notification preview uses draft settings without adding unread notices', async t => {
+  const {backend}=setup(t);let preview;
+  backend.previewNotice=options=>{preview=options};backend.busy=true;
+  await backend.api('test-notice',{KeepNotificationUntilDismissed:false,NotificationSeconds:2});
+  assert.deepEqual(preview,{KeepNotificationUntilDismissed:false,NotificationSeconds:2});
+  assert.equal(backend.notifications.length,0);assert.equal(backend.settings.NotificationSeconds,7);
+  await backend.api('test-notice',{KeepNotificationUntilDismissed:true,NotificationSeconds:999});
+  assert.equal(preview.NotificationSeconds,120);assert.equal(preview.KeepNotificationUntilDismissed,true);backend.busy=false;
+});
 test('loopback API, token, origin, host, method restrictions and busy guard', async t => {
   const {backend}=setup(t); await backend.start();
   const home=await fetch(backend.origin); assert.match(await home.text(),new RegExp(backend.token));

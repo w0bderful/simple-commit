@@ -243,6 +243,11 @@ class Backend {
   async api(route, d = {}) {
     if (!d || typeof d !== 'object' || Array.isArray(d)) throw Error('잘못된 요청입니다.');
     if (route === 'state') return this.state();
+    if (route === 'test-notice') {
+      if (!this.previewNotice) throw Error('알림 창을 아직 준비 중입니다.');
+      this.previewNotice({KeepNotificationUntilDismissed: d.KeepNotificationUntilDismissed === true, NotificationSeconds: Math.max(1, Math.min(120, Number(d.NotificationSeconds) || 7))});
+      return {ok: true};
+    }
     if (route === 'export') return {format: 'SimpleCommit', version: 1, repositories: this.repositories};
     if (route === 'ack') { this.notifications = this.notifications.filter(n => d.id !== 'all' && n.Id !== d.id); return {ok: true}; }
     if (route === 'branches') return this.branches(parseRepo(d.url));

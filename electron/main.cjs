@@ -1,10 +1,11 @@
-const {app,BrowserWindow,Tray,Menu,dialog,shell,session}=require('electron');
+const {app,BrowserWindow,Tray,Menu,dialog,shell,session,screen}=require('electron');
 const {spawn}=require('node:child_process');
 const path=require('node:path');
 const fs=require('node:fs');
 const {Backend}=require('./backend.cjs');
+const {DesktopNotices}=require('./desktop-notices.cjs');
 
-let window,tray,backend,origin,token,quitting=false,checkingQuit=false;
+let window,tray,backend,desktopNotices,origin,token,quitting=false,checkingQuit=false;
 const smoke=process.argv.includes('--smoke-test');
 const smokeData=process.argv.find(a=>a.startsWith('--smoke-data='))?.slice(13);
 const startHidden=process.argv.includes('--tray');
@@ -18,7 +19,7 @@ if(!app.requestSingleInstanceLock()){app.quit();}else{
  app.on('second-instance',()=>{log('SECOND_INSTANCE');openWindow();});
  app.on('activate',openWindow);
  app.on('window-all-closed',()=>{});
- app.on('before-quit',event=>{if(!quitting){event.preventDefault();quit();return;}if(backend)backend.close().catch(error=>log('CLOSE_ERROR '+error.message));});
+ app.on('before-quit',event=>{if(!quitting){event.preventDefault();quit();return;}desktopNotices?.close();if(backend)backend.close().catch(error=>log('CLOSE_ERROR '+error.message));});
  app.whenReady().then(async()=>{
     app.setAppUserModelId('io.w0bderful.simplecommit');
     const icon=app.isPackaged?path.join(process.resourcesPath,'app.ico'):path.join(__dirname,'..','app.ico');
@@ -28,6 +29,8 @@ if(!app.requestSingleInstanceLock()){app.quit();}else{
       pick:async zip=>{const result=await dialog.showOpenDialog(window,{title:zip?'기존 ZIP 연결':'ZIP 다운로드 폴더',properties:zip?['openFile']:['openDirectory','createDirectory'],...(zip?{filters:[{name:'ZIP 파일',extensions:['zip']}]}:{})});return result.canceled?'':result.filePaths[0]||'';},
       startup:enabled=>{if(!smoke)app.setLoginItemSettings({name:'SimpleCommitWeb',openAtLogin:enabled,path:process.env.PORTABLE_EXECUTABLE_FILE||process.execPath,args:app.isPackaged?['--tray']:[app.getAppPath(),'--tray']});}
     });
+    desktopNotices=new DesktopNotices(backend);
+    backend.previewNotice=options=>desktopNotices.preview(options);
     await backend.start();origin=backend.origin;token=backend.token;
     if(backend.settings.StartWithWindows)backend.startup(true);
     session.defaultSession.setPermissionRequestHandler((contents,permission,callback)=>callback(false));
@@ -59,12 +62,31 @@ if(!app.requestSingleInstanceLock()){app.quit();}else{
           expect(rowHeight<=76,'Rows are not compact');
           page('settings');input('CheckMinutes',181);input('KeepNotificationUntilDismissed',false);input('NotificationSeconds',2);await saved();
           let stored=await api('state');expect(stored.settings.CheckMinutes===181&&stored.settings.NotificationSeconds===2,'Settings not saved');
-          document.querySelector('#test-notice').click();expect(document.querySelector('[data-preview]'),'Test notice missing');await wait(2300);expect(!document.querySelector('[data-preview]'),'Timed notice did not expire');
-          input('KeepNotificationUntilDismissed',true);await saved();document.querySelector('#test-notice').click();await wait(3300);expect(document.querySelector('[data-preview]'),'Persistent notice disappeared');document.querySelector('[data-preview] button').click();await wait(220);expect(!document.querySelector('[data-preview]'),'Notice dismiss failed');
+          document.querySelector('#test-notice').click();await wait(250);expect(!document.querySelector('.toast'),'Duplicate in-app toast');await wait(2300);
+          input('KeepNotificationUntilDismissed',true);await saved();
           input('CheckMinutes',0);await wait(650);stored=await api('state');expect(stored.settings.CheckMinutes===181,'Invalid input was saved');input('CheckMinutes',180);await saved();page('repositories');
           openRepo();await wait(240);expect(document.querySelector('#repo-dialog').open,'Dialog did not open');closeDialog(document.querySelector('#repo-dialog'));await wait(220);expect(!document.querySelector('#repo-dialog').open,'Dialog did not close');const toggle=document.querySelector('#notice-toggle');toggle.click();toggle.click();toggle.click();await wait(240);expect(!document.querySelector('#notice-panel').hidden&&!document.querySelector('#notice-panel').inert,'Interrupted fade did not reopen');toggle.click();await wait(220);expect(document.querySelector('#notice-panel').hidden,'Panel did not fade out');await refresh();expect(document.querySelector('#rows').getAnimations({subtree:true}).length===0,'Polling animated rows');return {fades:true,version:state.version,rowHeight,autosave:true,notificationExpiry:true,persistentNotice:true,invalidInputProtected:true};
         })()`);
         log('UI_CHECKS '+JSON.stringify(checks));
+        const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+        const expect=(value,message)=>{if(!value)throw Error(message)};
+        window.hide();
+        await api('test-notice',{KeepNotificationUntilDismissed:true,NotificationSeconds:1});
+        for(let i=0;i<100&&!desktopNotices.window?.isVisible();i++)await wait(50);
+        expect(desktopNotices.window?.isVisible(),'Desktop notice did not open');
+        const bounds=desktopNotices.window.getBounds(),area=screen.getPrimaryDisplay().workArea;
+        expect(bounds.x+bounds.width===area.x+area.width-12&&bounds.y+bounds.height===area.y+area.height-12,'Desktop notice position incorrect');
+        expect(!window.isVisible()&&BrowserWindow.getFocusedWindow()!==desktopNotices.window,'Notice stole focus');
+        await wait(1300);expect(desktopNotices.window.isVisible(),'Persistent desktop notice expired');
+        await desktopNotices.window.webContents.capturePage().then(image=>fs.writeFileSync(path.join(smokeData,'desktop-notice.png'),image.toPNG()));
+        await desktopNotices.window.webContents.executeJavaScript("document.querySelector('button').click()");await wait(300);expect(!desktopNotices.queue.length,'Preview dismiss failed');
+        await api('test-notice',{KeepNotificationUntilDismissed:false,NotificationSeconds:1});await wait(1400);expect(!desktopNotices.queue.length&&!desktopNotices.window.isVisible(),'Timed desktop notice did not close');
+        for(let i=0;i<4;i++)backend.notice('백그라운드 알림 테스트 '+i);
+        desktopNotices.sync();await wait(100);expect(desktopNotices.queue.length===4&&desktopNotices.visible().length<=3,'Desktop notice queue failed');
+        await desktopNotices.window.webContents.executeJavaScript("document.querySelector('button').click()");await wait(350);expect(backend.notifications.length===3,'Desktop dismiss did not acknowledge');
+        await api('ack',{id:'all'});await wait(600);expect(!desktopNotices.queue.length,'Acknowledgement did not clear desktop notices');
+        log('DESKTOP_NOTICES_PASS '+JSON.stringify({bounds,workArea:area,hiddenMain:true,persistent:true,timed:true,queue:true}));
+        openWindow();
       }
       await window.webContents.capturePage().then(image=>fs.writeFileSync(path.join(smokeData,'electron-window.png'),image.toPNG()));
       window.close();if(window.isVisible())throw Error('Close-to-tray failed');openWindow();if(!window.isVisible())throw Error('Restore failed');
