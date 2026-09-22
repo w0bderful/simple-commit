@@ -126,7 +126,7 @@ class Backend {
   find(Id) { const e = this.repositories.find(r => r.Id === Id); if (!e) throw Error('저장소를 찾을 수 없습니다.'); return e; }
   sort() { if (this.settings.SortRecent) this.repositories.sort((a,b) => time(b.CommitUtc) - time(a.CommitUtc)); }
   state() {
-    return {settings: this.settings, repositories: this.repositories.map(e => ({...e, Name: parseRepo(e.Url).name, CommitUtc: time(e.CommitUtc) ? new Date(time(e.CommitUtc)).toISOString() : null, Age: age(e.CommitUtc), Zip: zipDescription(e)})), busy: this.busy, activity: this.activity, notifications: this.notifications, storage: this.dir};
+    return {version: require('./package.json').version, settings: this.settings, repositories: this.repositories.map(e => ({...e, Name: parseRepo(e.Url).name, CommitUtc: time(e.CommitUtc) ? new Date(time(e.CommitUtc)).toISOString() : null, Age: age(e.CommitUtc), Zip: zipDescription(e)})), busy: this.busy, activity: this.activity, notifications: this.notifications, storage: this.dir};
   }
   async json(url) {
     const r = await this.request(url, {headers: {'User-Agent': 'SimpleCommit/1.0', Accept: 'application/json'}, signal: AbortSignal.timeout(30000)});
