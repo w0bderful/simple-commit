@@ -35,7 +35,7 @@ if(!app.requestSingleInstanceLock()){app.quit();}else{
     if(backend.settings.StartWithWindows)backend.startup(true);
     session.defaultSession.setPermissionRequestHandler((contents,permission,callback)=>callback(false));
     session.defaultSession.setPermissionCheckHandler(()=>false);
-    window=new BrowserWindow({width:1360,height:900,minWidth:720,minHeight:560,show:false,backgroundColor:'#101513',title:'SimpleCommit',icon,autoHideMenuBar:true,webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
+    window=new BrowserWindow({width:1360,height:900,minWidth:720,minHeight:560,show:false,backgroundColor:'#101513',title:'SimpleCommit',icon,autoHideMenuBar:true,webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,backgroundThrottling:false}});
     window.removeMenu();
     window.webContents.setWindowOpenHandler(({url})=>{external(url);return {action:'deny'};});
     window.webContents.on('will-navigate',(event,url)=>{if(new URL(url).origin!==origin){event.preventDefault();external(url);}});
