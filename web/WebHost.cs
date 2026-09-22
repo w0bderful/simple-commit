@@ -23,12 +23,8 @@ public class WebHost {
     class Notice { public string Id=Guid.NewGuid().ToString("N"),Text; public DateTime Created=DateTime.UtcNow; }
     string Origin {get{return "http://127.0.0.1:"+port;}}
     JavaScriptSerializer Json(){return new JavaScriptSerializer{MaxJsonLength=4*1024*1024};}
-    public WebHost(string dir,int number,bool import){
+    public WebHost(string dir,int number){
         port=number;file=Path.Combine(dir,"settings.json");
-        if(import&&!File.Exists(file)&&!File.Exists(SettingsStore.ListPath(file))){
-            string legacy=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"SimpleCommit","settings.json");
-            if(File.Exists(legacy)){config=SettingsStore.Load(legacy);config.StartWithWindows=false;SettingsStore.Save(file,config);}
-        }
         config=SettingsStore.Load(file);
         // The desktop and web hosts have independent startup registrations.
         if(!File.Exists(file))config.StartWithWindows=false;
@@ -150,10 +146,10 @@ public class WebHost {
     void Tick(){lock(gate){if(!busy)Queue(config.Repositories.Where(x=>x.NextUtc<=DateTime.UtcNow).ToArray(),false);}}
     void Open(){System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Origin){UseShellExecute=true});}
     [STAThread]public static void Main(string[] args){
-        ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;int port=17843;string dir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"SimpleCommitWeb");bool import=true;
-        for(int i=0;i<args.Length-1;i++){if(args[i]=="--data"){dir=Path.GetFullPath(args[++i]);import=false;}else if(args[i]=="--port")port=Int32.Parse(args[++i]);}
+        ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;int port=17843;string dir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"SimpleCommitWeb");
+        for(int i=0;i<args.Length-1;i++){if(args[i]=="--data"){dir=Path.GetFullPath(args[++i]);}else if(args[i]=="--port")port=Int32.Parse(args[++i]);}
         bool created;using(var mutex=new Mutex(true,"Local\\SimpleCommitWeb-"+port,out created)){if(!created){System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("http://127.0.0.1:"+port){UseShellExecute=true});return;}
-        try{Application.EnableVisualStyles();var host=new WebHost(dir,port,import);host.Start();if(args.Contains("--embedded")&&host.config.StartWithWindows)host.RegisterStartup();using(var stream=typeof(WebHost).Assembly.GetManifestResourceStream("app.ico"))using(var icon=new System.Drawing.Icon(stream))using(var tray=new NotifyIcon{Icon=icon,Text="SimpleCommit Web",Visible=!args.Contains("--embedded")})using(var timer=new System.Windows.Forms.Timer{Interval=15000}){
+        try{Application.EnableVisualStyles();var host=new WebHost(dir,port);host.Start();if(args.Contains("--embedded")&&host.config.StartWithWindows)host.RegisterStartup();using(var stream=typeof(WebHost).Assembly.GetManifestResourceStream("app.ico"))using(var icon=new System.Drawing.Icon(stream))using(var tray=new NotifyIcon{Icon=icon,Text="SimpleCommit Web",Visible=!args.Contains("--embedded")})using(var timer=new System.Windows.Forms.Timer{Interval=15000}){
             var menu=new ContextMenuStrip();menu.Items.Add("웹 앱 열기",null,delegate{host.Open();});menu.Items.Add("종료",null,delegate{lock(host.gate){if(host.busy){MessageBox.Show("진행 중인 작업이 끝난 뒤 종료해 주세요.");return;}host.stopping=true;host.listener.Stop();Application.Exit();}});tray.ContextMenuStrip=menu;tray.DoubleClick+=delegate{host.Open();};timer.Tick+=delegate{string parent=Environment.GetEnvironmentVariable("SIMPLECOMMIT_PARENT_PID");if(parent!=null){try{if(System.Diagnostics.Process.GetProcessById(Int32.Parse(parent)).HasExited){Application.Exit();return;}}catch{Application.Exit();return;}}host.Tick();};timer.Start();host.Tick();if(!args.Contains("--tray")&&!args.Contains("--embedded"))host.Open();Application.Run();tray.Visible=false;}
         }catch(Exception ex){MessageBox.Show("웹 앱을 시작할 수 없습니다.\n"+ex.Message,"SimpleCommit Web");}}
     }

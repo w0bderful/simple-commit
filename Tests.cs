@@ -20,9 +20,9 @@ public static class Tests {
             Backend.DeletePreviousZip(zipTarget,zipTarget);Check(File.Exists(zipTarget),"same path cleanup preserves new ZIP");
             string storagePath=Path.Combine(storageDir,"settings.json");var original=new Settings{CheckMinutes=42};original.Repositories.Add(new RepoEntry{Url="https://github.com/a/b",DownloadSelected=true});
             File.WriteAllText(storagePath,new JavaScriptSerializer().Serialize(original));
-            var migrated=SettingsStore.Load(storagePath);SettingsStore.Save(storagePath,migrated);
+            var loadedLegacy=SettingsStore.Load(storagePath);Check(loadedLegacy.Repositories.Count==0,"inline legacy repositories ignored");SettingsStore.Save(storagePath,original);
             Check(!File.ReadAllText(storagePath).Contains("Repositories"),"settings excludes repository list");
-            var loaded=SettingsStore.Load(storagePath);Check(loaded.CheckMinutes==42&&loaded.Repositories.Count==1&&loaded.Repositories[0].DownloadSelected,"legacy list migration preserves settings and selection");
+            var loaded=SettingsStore.Load(storagePath);Check(loaded.CheckMinutes==42&&loaded.Repositories.Count==1&&loaded.Repositories[0].DownloadSelected,"separate list preserves settings and selection");
             loaded.Repositories.Clear();SettingsStore.Save(storagePath,loaded);Check(SettingsStore.Load(storagePath).Repositories.Count==0,"empty separate list stays empty");
             File.WriteAllText(SettingsStore.ListPath(storagePath),"invalid json");bool rejected=false;try{SettingsStore.Load(storagePath);}catch{rejected=true;}Check(rejected,"corrupt list does not silently reset");
         }finally{Directory.Delete(storageDir,true);}
@@ -47,7 +47,7 @@ public static class Tests {
         Check(c.Message=="hello"&&c.CommittedUtc==now.AddMinutes(-7),"GitHub uses committer date, correct timezone");
         c=Backend.Decode("[{\"id\":\""+sha+"\",\"title\":\"test\",\"committed_date\":\"2026-09-20T11:53:00Z\"}]",false);
         Check(c.CommittedUtc==now.AddMinutes(-7),"GitGud date");
-        var js=new JavaScriptSerializer();var legacy=js.Deserialize<Settings>("{\"Url\":\"https://github.com/a/b\",\"Branch\":\"main\",\"Folder\":\"C:\\\\Downloads\",\"LastSha\":\""+sha+"\",\"Watching\":true}");legacy.Migrate();legacy.Migrate();
+        var js=new JavaScriptSerializer();var legacy=js.Deserialize<Settings>("{\"Url\":\"https://github.com/a/b\",\"Branch\":\"main\",\"Folder\":\"C:\\\\Downloads\",\"LastSha\":\""+sha+"\",\"Watching\":true}");legacy.Normalize();legacy.Normalize();
         foreach(string host in new[]{"github.com","gitgud.io","codeberg.org","gitlab.com"}){
             var repo=Repo.Parse("https://"+host+"/a/b");int calls=0;
             var result=Backend.ReadBranches(repo,address=>{calls++;if(address==repo.Api)return "{\"default_branch\":\"main\"}";
@@ -57,9 +57,9 @@ public static class Tests {
                 return address.EndsWith("page=2")?"[{\"name\":\"main\"},{\"name\":\"feature/a\"}]":"[]";});
             Check(result.Names.Count==102&&result.Default=="main"&&result.Names.Contains("feature/a")&&calls==4,"all branch pages and default");
         }
-        Check(legacy.Repositories.Count==1&&legacy.Repositories[0].LastSha==sha&&legacy.Watching,"legacy migration once preserves monitoring");
+        Check(legacy.Repositories.Count==0,"legacy single repository is not migrated");legacy.Repositories.Add(new RepoEntry{Url="https://github.com/a/b",LastSha=sha});
         legacy.Repositories.Add(new RepoEntry{Url="https://gitgud.io/a/b",DownloadedSha=sha,DownloadedPath="test.zip",CommitUtc=now,DownloadSelected=true});
-        var saved=js.Deserialize<Settings>(js.Serialize(legacy));saved.Migrate();
+        var saved=js.Deserialize<Settings>(js.Serialize(legacy));saved.Normalize();
         Check(saved.Repositories.Count==2&&saved.Repositories[1].CommitUtc==now&&saved.Repositories[1].DownloadedSha==sha,"multi-repo persistence");
         Check(!saved.Repositories[0].DownloadSelected&&saved.Repositories[1].DownloadSelected,"selected and unselected repositories survive restart");
         var e=new RepoEntry{LastSha=sha};Check(ZipState.Describe(e,false)=="다운로드 안 함","no zip");e.DownloadedPath="x";e.DownloadedSha=sha;
@@ -75,9 +75,9 @@ public static class Tests {
         var gl=Repo.Parse("https://gitlab.com/group/sub/project.git");Check(gl.Api=="https://gitlab.com/api/v4/projects/group%2Fsub%2Fproject"&&gl.GitLabApi,"GitLab subgroup API");
         Check(gl.CommitUrl("feature/x").EndsWith("ref_name=feature%2Fx")&&gl.ZipUrl(sha).EndsWith("archive.zip?sha="+sha),"GitLab branch and ZIP URLs");
         var options=new Settings{DefaultDownloadFolder="C:\\CustomDownloads"};var restored=js.Deserialize<Settings>(js.Serialize(options));
-        var timing=new Settings{CheckMinutes=25,Watching=false};timing.Migrate();var timingRestored=js.Deserialize<Settings>(js.Serialize(timing));Check(timingRestored.CheckMinutes==25&&timingRestored.Watching,"interval persists and monitoring always enabled");
-        timing.CheckMinutes=0;timing.Migrate();Check(timing.CheckMinutes==1,"interval lower bound");
-        Check(js.Deserialize<Settings>("{}").KeepNotificationUntilDismissed,"existing settings default to persistent notifications");timing.KeepNotificationUntilDismissed=false;Check(!js.Deserialize<Settings>(js.Serialize(timing)).KeepNotificationUntilDismissed,"notification persistence preference saves");timing.NotificationSeconds=12;var noticeSettings=js.Deserialize<Settings>(js.Serialize(timing));Check(noticeSettings.NotificationSeconds==12,"notification duration persists");noticeSettings.NotificationSeconds=0;noticeSettings.Migrate();Check(noticeSettings.NotificationSeconds==1,"notification minimum");
+        var timing=new Settings{CheckMinutes=25};timing.Normalize();var timingRestored=js.Deserialize<Settings>(js.Serialize(timing));Check(timingRestored.CheckMinutes==25,"interval persists");
+        timing.CheckMinutes=0;timing.Normalize();Check(timing.CheckMinutes==1,"interval lower bound");
+        Check(js.Deserialize<Settings>("{}").KeepNotificationUntilDismissed,"existing settings default to persistent notifications");timing.KeepNotificationUntilDismissed=false;Check(!js.Deserialize<Settings>(js.Serialize(timing)).KeepNotificationUntilDismissed,"notification persistence preference saves");timing.NotificationSeconds=12;var noticeSettings=js.Deserialize<Settings>(js.Serialize(timing));Check(noticeSettings.NotificationSeconds==12,"notification duration persists");noticeSettings.NotificationSeconds=0;noticeSettings.Normalize();Check(noticeSettings.NotificationSeconds==1,"notification minimum");
         Check(restored.DefaultDownloadFolder==options.DefaultDownloadFolder,"default folder persistence");
         using(var d=new RepoDialog(null,restored.DefaultDownloadFolder))Check(d.Folder==options.DefaultDownloadFolder,"new repository uses default folder");
         using(var d=new RepoDialog(new RepoEntry{Folder="C:\\Existing"},restored.DefaultDownloadFolder))Check(d.Folder=="C:\\Existing","existing folder stays unchanged");
@@ -105,6 +105,6 @@ public static class Tests {
             Check(ZipState.Identify(native)==sha,"commit ID from git archive comment");Check(ZipState.FindExisting(entry).Sha==sha,"native ZIP full commit identification");
             var other=new RepoEntry{Url="https://github.com/owner/different",Folder=nativeDir};Check(ZipState.FindExisting(other)==null,"unrelated repository ZIP not connected");
         }finally{foreach(var file in Directory.GetFiles(nativeDir))File.Delete(file);Directory.Delete(nativeDir);}
-        Console.WriteLine("PASS: "+count+" checks — migration, multi-repo persistence, timestamps/timezones, ZIP comparison/import, URLs");
+        Console.WriteLine("PASS: "+count+" checks — storage, multi-repo persistence, timestamps/timezones, ZIP comparison/import, URLs");
     }
 }

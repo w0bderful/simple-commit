@@ -166,7 +166,7 @@ public class MainWindow : Form {
         repositoriesTab.Resize+=delegate{LayoutRepositoryTab();};
         details.Font=new Font("맑은 고딕",9); details.ForeColor=Color.DimGray; details.AutoEllipsis=true; schedule.ForeColor=Color.DimGray;
         config=new Settings();
-        try{if(!testing)config=SettingsStore.Load(configFile);config.Migrate();}catch{storageReadFailed=true;state.Text="설정 또는 저장소 목록을 읽지 못했습니다. 원본 보호를 위해 저장을 중단했습니다.";}
+        try{if(!testing)config=SettingsStore.Load(configFile);config.Normalize();}catch{storageReadFailed=true;state.Text="설정 또는 저장소 목록을 읽지 못했습니다. 원본 보호를 위해 저장을 중단했습니다.";}
         interval.Value=config.CheckMinutes;
         interval.ValueChanged+=delegate{config.CheckMinutes=(int)interval.Value;foreach(var e in config.Repositories)e.NextUtc=DateTime.UtcNow.AddMinutes(config.CheckMinutes);Save();RefreshSchedule();settingsStatus.Text="자동 확인 간격을 "+config.CheckMinutes+"분으로 저장했습니다.";};
         startup.Text="윈도우 시작 시 트레이에서 자동 실행"; startup.Checked=config.StartWithWindows;

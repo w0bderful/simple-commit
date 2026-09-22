@@ -16,7 +16,8 @@ public static class SettingsStore {
         var json=new JavaScriptSerializer();
         var settings=File.Exists(path)?json.Deserialize<Settings>(File.ReadAllText(path,Encoding.UTF8)):new Settings();
         if(settings==null)throw new InvalidDataException("설정 파일이 비어 있습니다.");
-        settings.Migrate();
+        settings.Normalize();
+        settings.Repositories=new List<RepoEntry>();
         string listPath=ListPath(path);
         if(File.Exists(listPath))settings.Repositories=json.Deserialize<List<RepoEntry>>(File.ReadAllText(listPath,Encoding.UTF8))??throwInvalidList();
         return settings;
@@ -29,8 +30,8 @@ public static class SettingsStore {
     public static void Save(string path,Settings settings){
         Directory.CreateDirectory(Path.GetDirectoryName(path));var json=new JavaScriptSerializer();
         var values=json.Deserialize<Dictionary<string,object>>(json.Serialize(settings));
-        foreach(string key in new[]{"Repositories","Url","Branch","Folder","LastSha","Key","NextUtc","Watching"})values.Remove(key);
-        // Write the list first so a failed migration never removes the only saved copy.
+        values.Remove("Repositories");
+        // Save repository data before settings.
         Write(ListPath(path),json.Serialize(settings.Repositories));
         Write(path,json.Serialize(values));
     }
@@ -44,18 +45,11 @@ public class Settings {
     public bool MaterialDark=false;
     public bool SortRecent=false;
     public List<RepoEntry> Repositories = new List<RepoEntry>();
-    public string Url = "", Branch = "", Folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-    public string LastSha = "", Key = "";
-    public bool Watching = false;
     public bool StartWithWindows = true;
-    public DateTime NextUtc = DateTime.MinValue;
-    public void Migrate() {
-        CheckMinutes=Math.Max(1,Math.Min(10080,CheckMinutes));Watching=true;
+    public void Normalize() {
+        CheckMinutes=Math.Max(1,Math.Min(10080,CheckMinutes));
         NotificationSeconds=Math.Max(1,Math.Min(120,NotificationSeconds));
         if (Repositories == null) Repositories = new List<RepoEntry>();
-        if (Repositories.Count == 0 && !String.IsNullOrWhiteSpace(Url))
-            Repositories.Add(new RepoEntry { Url=Url, Branch=Branch ?? "", Folder=Folder, LastSha=LastSha ?? "", NextUtc=NextUtc });
-        Url=""; Branch=""; LastSha=""; Key="";
     }
 }
 public static class RepoOrder {

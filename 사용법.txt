@@ -75,4 +75,4 @@ Windows 10/11, .NET Framework 4.7.2 이상
 설정 및 목록 저장 위치: %LOCALAPPDATA%\SimpleCommit
 - settings.json: 프로그램 설정
 - repositories.json: 저장소 목록, 선택 상태, ZIP 및 커밋 정보
-- 기존 통합 설정은 자동으로 분리되며 .bak 백업을 보관합니다.
+- 설정과 목록은 별도 파일로 저장하며 .bak 백업을 보관합니다. 구형 데이터는 자동으로 변환하지 않습니다.
