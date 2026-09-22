@@ -1,0 +1,45 @@
+{
+  "name": "simple-commit-desktop",
+  "version": "0.1.0",
+  "description": "SimpleCommit Material desktop application",
+  "author": "w0bderful",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable --x64"
+  },
+  "build": {
+    "appId": "io.w0bderful.simplecommit",
+    "productName": "SimpleCommit",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../web/SimpleCommit.Web.exe",
+        "to": "backend/SimpleCommit.Web.exe"
+      },
+      {
+        "from": "../app.ico",
+        "to": "app.ico"
+      }
+    ],
+    "win": {
+      "icon": "../app.ico",
+      "target": "portable",
+      "signExecutable": false
+    },
+    "portable": {
+      "artifactName": "SimpleCommit-Electron-${version}.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  }
+}

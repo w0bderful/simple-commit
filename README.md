@@ -63,3 +63,7 @@ Windows에 포함된 .NET Framework C# 컴파일러를 사용합니다. NuGet �
 `web/SimpleCommit.Web.exe`를 실행하면 브라우저에서 사용할 수 있습니다. 기존 설정과 목록을 처음 실행할 때 별도 웹 데이터 폴더로 가져오며, PC 폴더에 ZIP을 저장하는 기능을 유지합니다.
 
 웹 설정 화면에 **저장소 목록 내보내기 / 가져오기(JSON)**가 있습니다. [실행 및 빌드 안내](web/README.md)를 참고하세요.
+
+## Electron 자체 창 버전
+
+외부 브라우저 없이 실행하는 Electron 프로그램은 [electron/README.md](electron/README.md)를 참고하세요. 웹 버전 설정과 목록을 그대로 사용하며, 창 닫기는 트레이 숨김, 재실행은 기존 창 열기로 동작합니다.
