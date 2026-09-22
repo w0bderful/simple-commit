@@ -16,3 +16,12 @@
 .topbar .icon-button{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;padding:9px;color:var(--text)}
 .toolbar-icon{display:block;width:22px;height:22px;background:currentColor;mask-position:center;mask-repeat:no-repeat;mask-size:contain}
 .theme-icon{mask-image:url('/theme.svg')}.bell-icon{mask-image:url('/bell.svg')}
+/* One calm motion language; regular background refreshes do not restart fades. */
+@keyframes app-enter{from{opacity:0}to{opacity:1}}
+body{animation:app-enter .24s ease-out}
+body,.sidebar,.workspace,.settings-card,.stats article,.topbar,.nav,button,input,select,textarea,th,td,.pill,.branch,.menu,.notice-panel,.toast{transition:background-color .22s ease,color .22s ease,border-color .22s ease,box-shadow .18s ease,opacity .18s ease}
+button{transition:background-color .2s ease,color .2s ease,border-color .2s ease,opacity .18s ease,filter .18s ease,transform .15s ease}
+a,.toolbar-icon{transition:color .2s ease,background-color .2s ease}
+dialog::backdrop{transition:opacity .2s ease,display .2s allow-discrete,overlay .2s allow-discrete}
+@starting-style{dialog[open]::backdrop{opacity:0}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
