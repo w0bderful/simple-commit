@@ -82,11 +82,19 @@ if(!app.requestSingleInstanceLock()){app.quit();}else{
         expect(!window.isVisible()&&BrowserWindow.getFocusedWindow()!==desktopNotices.window,'Notice stole focus');
         await wait(1300);expect(desktopNotices.window.isVisible(),'Persistent desktop notice expired');
         await desktopNotices.window.webContents.capturePage().then(image=>fs.writeFileSync(path.join(smokeData,'desktop-notice.png'),image.toPNG()));
-        await desktopNotices.window.webContents.executeJavaScript("document.querySelector('button').click()");await wait(300);expect(!desktopNotices.queue.length,'Preview dismiss failed');
+        const clickNoticeClose=async()=>{
+          const popup=desktopNotices.window;
+          expect(popup.isFocusable(),'Desktop notice cannot receive user focus');
+          const point=await popup.webContents.executeJavaScript("(()=>{const r=document.querySelector('button').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()");
+          popup.focus();
+          popup.webContents.sendInputEvent({type:'mouseDown',...point,button:'left',clickCount:1});
+          popup.webContents.sendInputEvent({type:'mouseUp',...point,button:'left',clickCount:1});
+        };
+        await clickNoticeClose();await wait(300);expect(!desktopNotices.queue.length&&!desktopNotices.window.isVisible(),'Preview dismiss failed');
         await api('test-notice',{KeepNotificationUntilDismissed:false,NotificationSeconds:1});await wait(1400);expect(!desktopNotices.queue.length&&!desktopNotices.window.isVisible(),'Timed desktop notice did not close');
         for(let i=0;i<4;i++)backend.notice('백그라운드 알림 테스트 '+i);
         desktopNotices.sync();await wait(100);expect(desktopNotices.queue.length===4&&desktopNotices.visible().length<=3,'Desktop notice queue failed');
-        await desktopNotices.window.webContents.executeJavaScript("document.querySelector('button').click()");await wait(350);expect(backend.notifications.length===3,'Desktop dismiss did not acknowledge');
+        await clickNoticeClose();await wait(350);expect(backend.notifications.length===3,'Desktop dismiss did not acknowledge');
         await api('ack',{id:'all'});await wait(600);expect(!desktopNotices.queue.length,'Acknowledgement did not clear desktop notices');
         log('DESKTOP_NOTICES_PASS '+JSON.stringify({bounds,workArea:area,hiddenMain:true,persistent:true,timed:true,queue:true}));
         openWindow();

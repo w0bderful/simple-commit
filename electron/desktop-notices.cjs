@@ -27,7 +27,8 @@ class DesktopNotices {
   }
   create(){
     if(this.window||this.disposed)return;
-    this.window=new BrowserWindow({width:392,height:164,show:false,frame:false,transparent:true,hasShadow:false,skipTaskbar:true,resizable:false,movable:false,minimizable:false,maximizable:false,focusable:false,alwaysOnTop:true,title:'SimpleCommit 알림',webPreferences:{preload:path.join(__dirname,'notice-preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,backgroundThrottling:false}});
+    // Allow Windows to activate the close button on click; showInactive keeps new notices from stealing focus.
+    this.window=new BrowserWindow({width:392,height:164,show:false,frame:false,transparent:true,hasShadow:false,skipTaskbar:true,resizable:false,movable:false,minimizable:false,maximizable:false,focusable:true,alwaysOnTop:true,title:'SimpleCommit 알림',webPreferences:{preload:path.join(__dirname,'notice-preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,backgroundThrottling:false}});
     this.window.setAlwaysOnTop(true,'floating');
     this.window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
     this.window.webContents.on('will-navigate',event=>event.preventDefault());
