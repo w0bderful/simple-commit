@@ -150,6 +150,21 @@ test('shared previous file and destination collision are protected', async t => 
   other.DownloadedPath=e.DownloadedPath;e.DownloadedPath=old;e.DownloadedSha=NEXT;fs.unlinkSync(other.DownloadedPath);
   await backend.api('run',{download:true}); await backend.job; assert.match(e.Status,/파일명이 같습니다/);
 });
+test('GitLab and GitGud archive downloads avoid the default cors fetch metadata', async t => {
+  const server=require('node:http').createServer((req,res)=>{
+    if(req.headers['sec-fetch-mode']==='cors'){res.writeHead(406);return res.end('Not Acceptable')}
+    res.writeHead(200,{'Content-Type':'application/zip'});res.end(zip());
+  });
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  t.after(()=>new Promise(resolve=>{server.closeAllConnections();server.close(resolve)}));
+  const url='http://127.0.0.1:'+server.address().port;
+  const rejected=await fetch(url);assert.equal(rejected.status,406);await rejected.text();
+  const {backend,documents}=setup(t,{request:(_url,options)=>fetch(url,options)});
+  for(const host of ['gitgud.io','gitlab.com']){
+    const file=await backend.download(parseRepo('https://'+host+'/owner/project'),SHA,'master',documents);
+    assert.equal((await inspectZip(file)).sha,SHA);
+  }
+});
 test('desktop notification preview uses draft settings without adding unread notices', async t => {
   const {backend}=setup(t);let preview;
   backend.previewNotice=options=>{preview=options};backend.busy=true;

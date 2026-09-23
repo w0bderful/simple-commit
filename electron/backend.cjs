@@ -188,7 +188,8 @@ class Backend {
     const temp = path.join(dir, `.simplecommit-${id()}.part`);
     const url = repo.gitlab ? `${repo.api}/repository/archive.zip?sha=${encodeURIComponent(sha)}` : repo.host === 'codeberg.org' ? `${repo.api}/archive/${sha}.zip` : `${repo.api}/zipball/${sha}`;
     try {
-      const response = await this.request(url, {headers: {'User-Agent': 'SimpleCommit/1.0'}, signal: AbortSignal.timeout(30 * 60000)});
+      // GitLab rejects archive requests carrying Node fetch's default Sec-Fetch-Mode: cors.
+      const response = await this.request(url, {...(repo.gitlab ? {mode: 'same-origin'} : {}), headers: {'User-Agent': 'SimpleCommit/1.0'}, signal: AbortSignal.timeout(30 * 60000)});
       if (!response.ok || !response.body) throw Error(`ZIP 다운로드 실패 (${response.status})`);
       let bytes = 0;
       const progress = new Transform({transform: (chunk, encoding, done) => { bytes += chunk.length; this.activity = `${repo.name} · ${(bytes / 1048576).toFixed(1)} MB`; done(null, chunk); }});
