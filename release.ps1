@@ -51,7 +51,7 @@ do {
 if($text -notmatch 'UI_CHECKS' -or $text -notmatch ('"version":"'+[regex]::Escape($Version)+'"') -or $text -notmatch 'RELAUNCH_RESTORE_PASS'){throw 'Packaged UI test timed out or version mismatch.'}
 Write-Output "Packaged UI tests passed for $tag"
 $zip=Join-Path $PSScriptRoot "electron/dist/SimpleCommit-$Version-Windows.zip"
-Compress-Archive -LiteralPath @($exe,(Join-Path $PSScriptRoot '사용법.txt')) -DestinationPath $zip -Force
+Compress-Archive -LiteralPath $exe -DestinationPath $zip -Force
 git add -- electron/package.json
 CheckExit 'Stage version'
 git commit -m "Release $tag"
