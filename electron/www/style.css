@@ -26,3 +26,7 @@ dialog::backdrop{transition:opacity .2s ease,display .2s allow-discrete,overlay 
 @starting-style{dialog[open]::backdrop{opacity:0}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 .brand-link{transition:color .2s ease}.brand-link:hover{color:var(--accent)}
+
+/* Compact header keeps attention on the repository list. */
+.topbar{height:52px;justify-content:flex-end;border-bottom:0}
+#repositories-page .heading{margin:8px 0 18px}
