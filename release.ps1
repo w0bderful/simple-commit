@@ -45,7 +45,12 @@ $log=Join-Path $testDir 'electron-test.log'
 $deadline=(Get-Date).AddSeconds(60)
 do {
     Start-Sleep -Milliseconds 500
-    $text=if(Test-Path -LiteralPath $log){[IO.File]::ReadAllText($log)}else{''}
+    $text=''
+    if(Test-Path -LiteralPath $log){
+        $stream=[IO.File]::Open($log,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+        $reader=[IO.StreamReader]::new($stream)
+        try {$text=$reader.ReadToEnd()} finally {$reader.Dispose()}
+    }
     if($text -match 'ERROR '){throw "Packaged UI test failed: $text"}
 }while(($text -notmatch 'UI_CHECKS' -or $text -notmatch 'RELAUNCH_RESTORE_PASS') -and (Get-Date) -lt $deadline)
 if($text -notmatch 'UI_CHECKS' -or $text -notmatch ('"version":"'+[regex]::Escape($Version)+'"') -or $text -notmatch 'RELAUNCH_RESTORE_PASS'){throw 'Packaged UI test timed out or version mismatch.'}
